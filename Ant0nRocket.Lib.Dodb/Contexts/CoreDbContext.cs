@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Ant0nRocket.Lib.Dodb.Contexts
 {
-    public abstract class DbContextBase : DbContext
+    public class CoreDbContext : DbContext
     {
         public DbSet<Document> Documents { get; set; }
 

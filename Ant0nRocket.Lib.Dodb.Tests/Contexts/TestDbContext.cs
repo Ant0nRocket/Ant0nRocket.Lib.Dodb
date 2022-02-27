@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Ant0nRocket.Lib.Dodb.Tests.Contexts
 {
     [Transient]
-    internal class TestDbContext : DbContextBase
+    public class TestDbContext : CoreDbContext
     {
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {

@@ -16,10 +16,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Services\" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\Ant0nRocket.Lib.Dodb\Ant0nRocket.Lib.Dodb.csproj" />
   </ItemGroup>
 
