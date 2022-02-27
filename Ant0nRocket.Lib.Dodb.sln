@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.1.32210.238
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Ant0nRocket.Lib.Dodb", "Ant0nRocket.Lib.Dodb\Ant0nRocket.Lib.Dodb.csproj", "{FC946C77-A771-4AF6-BBF2-2FB9F326BA4D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ant0nRocket.Lib.Dodb.Tests", "Ant0nRocket.Lib.Dodb.Tests\Ant0nRocket.Lib.Dodb.Tests.csproj", "{822F6482-8375-42E1-964D-89D76A0DFDBE}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{FC946C77-A771-4AF6-BBF2-2FB9F326BA4D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FC946C77-A771-4AF6-BBF2-2FB9F326BA4D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FC946C77-A771-4AF6-BBF2-2FB9F326BA4D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FC946C77-A771-4AF6-BBF2-2FB9F326BA4D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{822F6482-8375-42E1-964D-89D76A0DFDBE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{822F6482-8375-42E1-964D-89D76A0DFDBE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{822F6482-8375-42E1-964D-89D76A0DFDBE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{822F6482-8375-42E1-964D-89D76A0DFDBE}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {D67E85AF-C26D-4B88-B1D8-E1F1C4609962}
+	EndGlobalSection
+EndGlobal
