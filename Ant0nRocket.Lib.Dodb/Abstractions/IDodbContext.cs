@@ -4,9 +4,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Ant0nRocket.Lib.Dodb.Dto.UsersService
+namespace Ant0nRocket.Lib.Dodb.Abstractions
 {
-    public class DtoCreateUser : DtoBase<DtoCreateUserPayload>
+    public class IDodbContext
     {
+
     }
 }

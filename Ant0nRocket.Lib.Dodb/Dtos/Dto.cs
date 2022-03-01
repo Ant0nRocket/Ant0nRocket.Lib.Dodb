@@ -1,6 +1,6 @@
-﻿namespace Ant0nRocket.Lib.Dodb.Dto
+﻿namespace Ant0nRocket.Lib.Dodb.Dtos
 {
-    public abstract class DtoBase<T> where T : class, new()
+    public class Dto<T> where T : class, new()
     {
         /// <summary>
         /// Globally unique identifier of a document.

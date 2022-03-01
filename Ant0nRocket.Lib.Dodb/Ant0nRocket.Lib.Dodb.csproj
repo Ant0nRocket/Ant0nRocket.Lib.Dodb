@@ -9,12 +9,14 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Ant0nRocket.Lib.Std20" Version="1.3.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="6.0.2" />
+    <Compile Remove="Services\Responses\UsersService\**" />
+    <EmbeddedResource Remove="Services\Responses\UsersService\**" />
+    <None Remove="Services\Responses\UsersService\**" />
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Services\Responses\UsersService\" />
+    <PackageReference Include="Ant0nRocket.Lib.Std20" Version="1.5.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="6.0.2" />
   </ItemGroup>
 
 </Project>
