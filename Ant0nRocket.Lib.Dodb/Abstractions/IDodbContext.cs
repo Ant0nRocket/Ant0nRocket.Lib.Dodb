@@ -1,13 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using Ant0nRocket.Lib.Dodb.Entities;
+
+using Microsoft.EntityFrameworkCore;
 
 namespace Ant0nRocket.Lib.Dodb.Abstractions
 {
-    public class IDodbContext
+    public interface IDodbContext
     {
-
+        DbSet<Document> Documents { get; set; }
     }
 }

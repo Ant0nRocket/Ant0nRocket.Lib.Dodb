@@ -2,9 +2,7 @@
 {
     public class Document : EntityBase
     {
-        public User User { get; set; }
-
-        public Guid UserId { get; set; }
+        public Guid AuthorId { get; set; }
 
         public string DtoPayload { get; set; }
 

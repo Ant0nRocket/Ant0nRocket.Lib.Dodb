@@ -1,15 +1,14 @@
-﻿using Ant0nRocket.Lib.Dodb.Services;
-using Ant0nRocket.Lib.Std20.Logging;
-
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using Ant0nRocket.Lib.Dodb.Abstractions;
+using Ant0nRocket.Lib.Dodb.Dtos;
+using Ant0nRocket.Lib.Dodb.Gateway.Responces;
 
 namespace Ant0nRocket.Lib.Dodb.Tests.Services
 {
-    public class TestService : ServiceBase
+    public static class TestService
     {
+        public static GatewayResponse TestMethod(Dto<TestPayload> dto)
+        {
+            return new GrDocumentSaved();
+        }
     }
 }

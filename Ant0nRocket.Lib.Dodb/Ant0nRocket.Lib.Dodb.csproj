@@ -9,9 +9,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="Services\Responses\UsersService\**" />
-    <EmbeddedResource Remove="Services\Responses\UsersService\**" />
-    <None Remove="Services\Responses\UsersService\**" />
+    <Compile Remove="Dtos\Payloads\**" />
+    <EmbeddedResource Remove="Dtos\Payloads\**" />
+    <None Remove="Dtos\Payloads\**" />
   </ItemGroup>
 
   <ItemGroup>
