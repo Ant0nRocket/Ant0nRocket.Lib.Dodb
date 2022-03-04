@@ -18,7 +18,23 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
     {
         private static readonly Logger logger = Logger.Create(nameof(DodbGateway));
 
+        static DodbGateway()
+        {
+            Logger.OnLog += Logger_OnLog;
+        }
+
+        private static void Logger_OnLog(object sender, (DateTime Date, string Message, LogLevel Level, string SenderClassName, string SenderMethodName) e)
+        {
+            BasicLogWritter.WriteToLog(e.Date, e.Message, e.Level, e.SenderClassName, e.SenderMethodName);
+        }
+
         #region DbContext getter
+
+        /*
+         Why we need a DbContext getter?
+         This class doesn't know about the final class you will work with but it has to be IDodbContext.
+         As you DbContext will be somewhere in external library we need to know how to get it.
+         */
 
         private static Func<IDodbContext> contextGetter;
 
@@ -32,12 +48,27 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
         #region Dto handlers
 
-        private static Dictionary<Type, Func<object, GatewayResponse>> dtoHandleMap;
+        /*
+         And this section is about handling DTOs that pushed here from somewhere.
+         Again, we dont know which function of which service handles DTO, so you have to
+         register a Dictionaty of <[DtoType>, Func<dto as object, GatewayResponse>>.
+         */
 
-        public static void RegisterDtoHandler(Dictionary<Type, Func<object, GatewayResponse>> value) =>
-            dtoHandleMap = value;
+        private static Dictionary<Type, Func<IDto, GatewayResponse>> dtoHandleMap = new();
+
+
+        public static void RegisterDtoHandler<T>(Func<T, GatewayResponse> handler) where T : IDto
+        {
+            var type = typeof(T);
+            if (dtoHandleMap.ContainsKey(type))
+                throw new ArgumentException($"Handler for type '{type}' already registred");
+
+            dtoHandleMap.Add(type, handler as Func<IDto, GatewayResponse>);
+            logger.LogTrace($"Handler registred for type '{type}'");
+        }
 
         #endregion
+
 
         public static GatewayResponse PushDto<T>(Dto<T> dto) where T : class, new()
         {

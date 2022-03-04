@@ -1,6 +1,8 @@
-﻿namespace Ant0nRocket.Lib.Dodb.Dtos
+﻿using Ant0nRocket.Lib.Dodb.Abstractions;
+
+namespace Ant0nRocket.Lib.Dodb.Dtos
 {
-    public class Dto<T> where T : class, new()
+    public class Dto<T> : IDto where T : class, new()
     {
         /// <summary>
         /// Globally unique identifier of a document.

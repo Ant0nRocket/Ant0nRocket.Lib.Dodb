@@ -17,15 +17,13 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         public DateTime DateT { get; set; } = DateTime.Now;
     }
 
-    internal class T001_Init
+    public class T001_Init
     {
         [Test]
-        public void T001_Playing_Games()
+        public void T001_RegisterGetterAndHandlers()
         {
             DodbGateway.RegisterContextGetter(new Func<IDodbContext>(() => new TestDbContext()));
-            DodbGateway.RegisterDtoHandler(new() {
-                { typeof(Dto<TestPayload>), obj => TestService.TestMethod(obj) }
-            });
+            DodbGateway.RegisterDtoHandler<Dto<TestPayload>>(obj => TestService.TestMethod(obj));
         }
     }
 }
