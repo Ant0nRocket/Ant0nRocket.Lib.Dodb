@@ -2,7 +2,7 @@
 
 namespace Ant0nRocket.Lib.Dodb.Dtos
 {
-    public class Dto<T> : IDto where T : class, new()
+    public class Dto
     {
         /// <summary>
         /// Globally unique identifier of a document.
@@ -24,11 +24,5 @@ namespace Ant0nRocket.Lib.Dodb.Dtos
         /// Library will assign it automatically.
         /// </summary>
         public DateTime DateCreated { get; set; } = DateTime.MinValue;
-
-        /// <summary>
-        /// A payload of the document. Everything could be here,
-        /// no limitations.
-        /// </summary>
-        public T Payload { get; set; } = new();
     }
 }

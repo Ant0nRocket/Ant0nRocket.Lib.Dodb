@@ -3,6 +3,8 @@ using Ant0nRocket.Lib.Dodb.Dtos;
 using Ant0nRocket.Lib.Dodb.Gateway.Responces;
 using Ant0nRocket.Lib.Std20.Logging;
 
+using System.ComponentModel.DataAnnotations;
+
 namespace Ant0nRocket.Lib.Dodb.Gateway
 {
     /// <summary>
@@ -54,32 +56,71 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
          register a Dictionaty of <[DtoType>, Func<dto as object, GatewayResponse>>.
          */
 
-        private static Dictionary<Type, Func<IDto, GatewayResponse>> dtoHandleMap = new();
+        public static Dictionary<Type, Func<Dto, GatewayResponse>> DtoHandleMap = new();
 
 
-        public static void RegisterDtoHandler<T>(Func<T, GatewayResponse> handler) where T : IDto
-        {
-            var type = typeof(T);
-            if (dtoHandleMap.ContainsKey(type))
-                throw new ArgumentException($"Handler for type '{type}' already registred");
+        ////public static void RegisterDtoHandler<T>(Func<U, GatewayResponse> handler) where T : class, new()
+        ////{
+        ////    var type = typeof(T);
+        ////    if (dtoHandleMap.ContainsKey(type))
+        ////        throw new ArgumentException($"Handler for type '{type}' already registred");
 
-            dtoHandleMap.Add(type, handler as Func<IDto, GatewayResponse>);
-            logger.LogTrace($"Handler registred for type '{type}'");
-        }
+        ////    //var value = (Func<Dto, GatewayResponse>)handler;
+        ////    dtoHandleMap.Add(type, handler);
+        ////    logger.LogTrace($"Handler registred for type '{type}'");
+        ////}
 
         #endregion
 
 
-        public static GatewayResponse PushDto<T>(Dto<T> dto) where T : class, new()
+        public static GatewayResponse PushDto<TPayload>(U dto) where TPayload : class, new()
         {
-            var type = typeof(T);
-            if (!dtoHandleMap.ContainsKey(type))
+            var type = typeof(TPayload);
+            if (!DtoHandleMap.ContainsKey(type))
             {
-                logger.LogError($"DTO of unregistred type '{type}' received");
-                return new GrUnknownDtoPayloadType();
+                logger.LogError($"Handler of payload-type '{type}' are not registred");
+                return new GrDtoHandlerNotFount() { Value = dto };
             }
 
-            return dtoHandleMap[type](dto);
+            if (!IsDtoPropertiesValid(dto))
+            {
+                const string MESSAGE = "DTO with invalid IDto properties received";
+                logger.LogError(MESSAGE);
+                return new GrDtoIsInvalid(MESSAGE);
+            }
+
+            var validationErrors = ValidatePayload(dto);
+            if (validationErrors.Count > 0)
+            {
+                var validationErrorsJoined = string.Join(", ", validationErrors);
+                logger.LogError(validationErrorsJoined);
+                return new GrDtoIsInvalid(validationErrors);
+            }
+
+            return DtoHandleMap[type](dto);
+        }
+
+        /// <summary>
+        /// Returnes true if <see cref="IDto"/> properties has some values.
+        /// Othervise - false.
+        /// </summary>
+        private static bool IsDtoPropertiesValid(Dto dto) =>
+            dto.Id != Guid.Empty &&
+            dto.UserId != Guid.Empty &&
+            dto.DateCreated != DateTime.MinValue;
+
+        /// <summary>
+        /// Returnes a list of errors inside a payload.<br />
+        /// If the list is empty then there are no errors found.
+        /// </summary>
+        private static List<string> ValidatePayload(U dto)
+        {
+            var errorsList = new List<string>();
+            var validationContext = new ValidationContext(dto.Payload);
+            var validationResults = new List<ValidationResult>();
+            if (!Validator.TryValidateObject(dto.Payload, validationContext, validationResults, validateAllProperties: true))
+                validationResults.ForEach(vr => errorsList.Add(vr.ErrorMessage));
+            return errorsList;
         }
     }
 }
