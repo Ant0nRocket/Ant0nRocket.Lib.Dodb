@@ -7,7 +7,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway.Responces
     /// Returnes when there is some trash object received,
     /// which couldn't be casted to IDto.
     /// </summary>
-    public class GrDtoHandlerNotFount : GatewayResponse
+    public class GrDtoHandlerNotFound : GatewayResponse
     {
         public Dto Value { get; init; }
     }

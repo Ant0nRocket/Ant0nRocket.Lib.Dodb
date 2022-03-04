@@ -10,10 +10,10 @@ namespace Ant0nRocket.Lib.Dodb.Tests.Services
     {
         private static readonly Logger logger = Logger.Create(nameof(TestService));
 
-        public static GatewayResponse TestMethod(DtoOf<TestPayload> dto)
+        public static GatewayResponse TestMethod(DtoOf<TestPayload> dto, IDodbContext context)
         {
             logger.LogDebug($"some work with TestPayload DTO");
-            return new GrDocumentSaved();
+            return new GrDtoSaveSuccess();
         }
     }
 }

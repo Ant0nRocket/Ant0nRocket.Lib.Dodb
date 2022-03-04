@@ -23,6 +23,6 @@ namespace Ant0nRocket.Lib.Dodb.Dtos
         /// Date when the document was created.<br />
         /// Library will assign it automatically.
         /// </summary>
-        public DateTime DateCreated { get; set; } = DateTime.MinValue;
+        public DateTime DateCreatedUtc { get; set; } = DateTime.UtcNow;
     }
 }

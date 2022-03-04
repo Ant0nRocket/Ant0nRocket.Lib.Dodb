@@ -2,6 +2,6 @@
 {
     public abstract class GatewayResponse
     {
-        public DateTime DateCreated = DateTime.UtcNow;
+        public DateTime DateCreatedUtc = DateTime.UtcNow;
     }
 }

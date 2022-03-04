@@ -1,10 +1,12 @@
-﻿namespace Ant0nRocket.Lib.Dodb.Gateway.Responces
+﻿using Ant0nRocket.Lib.Dodb.Abstractions;
+
+namespace Ant0nRocket.Lib.Dodb.Gateway.Responces
 {
     /// <summary>
     /// Returned when <see cref="Lib.Dodb.Entities.Document"/> already exists
     /// in database (by it's Id)
     /// </summary>
-    public class GrDocumentExists
+    public class GrDocumentExists : GatewayResponse
     {
         /// <summary>
         /// Id of document that is already exists
