@@ -103,6 +103,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             dbContext.Documents.Add(document);
 
             var dtoSaveResult = DodbDtoHandler<TPayload>.GetDtoHandler()?.Invoke(dto, dbContext);
+
             if (dtoSaveResult is not GrDtoSaveSuccess)
             {
                 logger.LogError($"Unable to save DTO '{dto.Id}'");
