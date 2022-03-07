@@ -21,6 +21,6 @@
         /// Date when the document was created.<br />
         /// Library will assign it automatically.
         /// </summary>
-        public DateTime DateCreatedUtc { get; set; } = DateTime.UtcNow;
+        public DateTime DateCreatedUtc { get; set; } = DateTime.MinValue;
     }
 }

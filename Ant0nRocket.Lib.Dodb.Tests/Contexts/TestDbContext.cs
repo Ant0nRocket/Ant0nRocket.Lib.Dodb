@@ -16,10 +16,16 @@ namespace Ant0nRocket.Lib.Dodb.Tests.Contexts
             optionsBuilder.UseSqlite($"Filename='{fileName}'");
         }
 
+        private static bool databaseRecteated = false;
+
         public TestDbContext()
         {
-            Database.EnsureDeleted();
-            Database.EnsureCreated();
+            if (!databaseRecteated)
+            {
+                Database.EnsureDeleted();
+                Database.EnsureCreated();
+                databaseRecteated = true;
+            }
         }
     }
 }

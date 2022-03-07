@@ -77,7 +77,26 @@ namespace Ant0nRocket.Lib.Dodb.Tests
             };
 
             dto.UserId = Guid.NewGuid(); // mock, for passing basic validation
-            dto.DateCreatedUtc = DateTime.Now; // same reason
+
+            var result = DodbGateway.PushDto(dto);
+
+            Assert.That(result, Is.Not.Null);
+            Assert.That(result is GrDtoSaveSuccess);
+        }
+
+        [Test]
+        public void T006_SendAnotherValidDto()
+        {
+            var dto = new DtoOf<AnnotatedPayload>()
+            {
+                Payload = new()
+                {
+                    SomeIntValue = 19,
+                    SomeStringValue = "Olga"
+                }
+            };
+
+            dto.UserId = Guid.NewGuid(); // mock, for passing basic validation
 
             var result = DodbGateway.PushDto(dto);
 

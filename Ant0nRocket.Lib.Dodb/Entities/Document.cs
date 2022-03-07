@@ -4,6 +4,8 @@
     {
         public Guid AuthorId { get; set; }
 
+        public Guid RequiredDocumentId { get; set; }
+
         public string DtoPayload { get; set; }
 
         public string DtoType { get; set; }

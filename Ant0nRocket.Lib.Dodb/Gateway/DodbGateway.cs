@@ -45,7 +45,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
         public static void RegisterContextGetter(Func<IDodbContext> value) =>
             contextGetter = value;
 
-        private static IDodbContext GetContext() =>
+        public static IDodbContext GetContext() =>
             contextGetter?.Invoke();
 
         #endregion
@@ -76,25 +76,60 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             using var dbContext = GetContext();
 
             if (dbContext.Documents.AsNoTracking().Any(d => d.Id == dto.Id))
+                return new GrDocumentExists { DocumentId = dto.Id }.WithLogging();
+
+            using var transaction = (dbContext as DbContext).Database.BeginTransaction();
+
+            var dtoSaveResult = TryApplyDtoAndSaveDocument(dto, dbContext);
+
+            if (dtoSaveResult is not GrDtoSaveSuccess)
             {
-                logger.LogWarning($"Document with Id '{dto.Id}' already exists");
-                return new GrDocumentExists { DocumentId = dto.Id };
+                logger.LogError($"Unable to save DTO '{dto.Id}': {dtoSaveResult.GetType().Name} returned");
+                return dtoSaveResult;
             }
 
-            // By this step all checks are done, let's check required document (if specified) exists
+            try
+            {
+                dbContext.SaveChanges();
+                transaction.Commit();
+                return new GrDtoSaveSuccess { DocumentId = dto.Id }.WithLogging();
+            }
+            catch (Exception ex)
+            {
+                logger.LogException(ex);
+                transaction.Rollback();
+                return new GrDtoSaveFailed { DocumentId = dto.Id }.WithLogging(logLevel: LogLevel.Error);
+            }
+
+        }
+
+        private static GatewayResponse TryApplyDtoAndSaveDocument<TPayload>(DtoOf<TPayload> dto, IDodbContext dbContext) where TPayload : class, new()
+        {
             if (dto.RequiredDocumentId != default)
                 if (!dbContext.Documents.AsNoTracking().Any(d => d.Id == dto.RequiredDocumentId))
                 {
-                    logger.LogError($"DTO '{dto.Id}' requires Document '{dto.RequiredDocumentId}' which is not found");
-                    return new GrDatabaseError();
+                    return new GrRequiredDocumentNotFound
+                    {
+                        RequesterId = dto.Id,
+                        RequiredDocumentId = dto.RequiredDocumentId
+                    }
+                    .WithLogging(logLevel: LogLevel.Error);
                 }
 
-            using var transaction = (dbContext as DbContext).Database.BeginTransaction();
+            if (dto.DateCreatedUtc == DateTime.MinValue)
+            {
+                dto.RequiredDocumentId = dbContext
+                    .Documents.AsNoTracking()
+                    .OrderByDescending(d => d.DateCreatedUtc)
+                    .FirstOrDefault()?.Id ?? Guid.Empty;
+                dto.DateCreatedUtc = DateTime.UtcNow;
+            }
 
             var document = new Document()
             {
                 Id = dto.Id,
                 AuthorId = dto.UserId,
+                RequiredDocumentId = dto.RequiredDocumentId,
                 DateCreatedUtc = dto.DateCreatedUtc,
                 DtoType = $"{typeof(TPayload)}",
                 DtoPayload = dto.Payload.AsJson()
@@ -102,28 +137,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
             dbContext.Documents.Add(document);
 
-            var dtoSaveResult = DodbDtoHandler<TPayload>.GetDtoHandler()?.Invoke(dto, dbContext);
-
-            if (dtoSaveResult is not GrDtoSaveSuccess)
-            {
-                logger.LogError($"Unable to save DTO '{dto.Id}'");
-                return new GrDtoSaveFailed();
-            }
-
-            try
-            {
-                dbContext.SaveChanges();
-                transaction.Commit();
-                logger.LogInformation($"DTO '{dto.Id}' saved");
-                return new GrDtoSaveSuccess();
-            }
-            catch (Exception ex)
-            {
-                logger.LogException(ex);
-                transaction.Rollback();
-                return new GrDtoSaveFailed();
-            }
-
+            return DodbDtoHandler<TPayload>.GetDtoHandler()?.Invoke(dto, dbContext);
         }
 
         /// <summary>
@@ -137,7 +151,6 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             // Check basic properties
             if (dto.Id == Guid.Empty) errorsList.Add($"{nameof(dto.Id)} is not set");
             if (dto.UserId == Guid.Empty) errorsList.Add($"{nameof(dto.UserId)} is not set");
-            if (dto.DateCreatedUtc == DateTime.MinValue) errorsList.Add($"{nameof(dto.DateCreatedUtc)} is not set");
 
             // Check payload using annotations
             var validationContext = new ValidationContext(dto.Payload);
