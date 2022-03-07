@@ -128,7 +128,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             var document = new Document()
             {
                 Id = dto.Id,
-                AuthorId = dto.UserId,
+                AuthorId = dto.AuthorId,
                 RequiredDocumentId = dto.RequiredDocumentId,
                 DateCreatedUtc = dto.DateCreatedUtc,
                 DtoType = $"{typeof(TPayload)}",
@@ -150,7 +150,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
             // Check basic properties
             if (dto.Id == Guid.Empty) errorsList.Add($"{nameof(dto.Id)} is not set");
-            if (dto.UserId == Guid.Empty) errorsList.Add($"{nameof(dto.UserId)} is not set");
+            if (dto.AuthorId == Guid.Empty) errorsList.Add($"{nameof(dto.AuthorId)} is not set");
 
             // Check payload using annotations
             var validationContext = new ValidationContext(dto.Payload);

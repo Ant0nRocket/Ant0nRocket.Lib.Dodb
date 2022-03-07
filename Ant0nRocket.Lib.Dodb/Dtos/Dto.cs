@@ -10,7 +10,7 @@
         /// <summary>
         /// Id of author of the document.
         /// </summary>
-        public Guid UserId { get; set; } = Guid.Empty;
+        public Guid AuthorId { get; set; } = Guid.Empty;
 
         /// <summary>
         /// Requires specified document to exists in database.

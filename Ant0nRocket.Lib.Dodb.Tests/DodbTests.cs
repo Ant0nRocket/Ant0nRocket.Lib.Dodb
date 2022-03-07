@@ -7,15 +7,18 @@ using Ant0nRocket.Lib.Dodb.Tests.Contexts;
 using Ant0nRocket.Lib.Dodb.Tests.Dto.Payloads;
 using Ant0nRocket.Lib.Dodb.Tests.Entities;
 using Ant0nRocket.Lib.Dodb.Tests.Services;
+using Ant0nRocket.Lib.Std20.IO;
 
 using NUnit.Framework;
 
 using System;
+using System.Collections.Generic;
+using System.IO;
 
 namespace Ant0nRocket.Lib.Dodb.Tests
 {
 
-    public class T001_Init
+    public class DodbTests
     {
         [Test]
         public void T001_RegisterGetterAndHandlers()
@@ -54,7 +57,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
                 } 
             };
 
-            dto.UserId = Guid.NewGuid(); // mock, for passing basic validation
+            dto.AuthorId = Guid.NewGuid(); // mock, for passing basic validation
             dto.DateCreatedUtc = DateTime.Now; // same reason
 
             var result = DodbGateway.PushDto(dto);
@@ -76,7 +79,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
                 }
             };
 
-            dto.UserId = Guid.NewGuid(); // mock, for passing basic validation
+            dto.AuthorId = Guid.NewGuid(); // mock, for passing basic validation
 
             var result = DodbGateway.PushDto(dto);
 
@@ -96,12 +99,25 @@ namespace Ant0nRocket.Lib.Dodb.Tests
                 }
             };
 
-            dto.UserId = Guid.NewGuid(); // mock, for passing basic validation
+            dto.AuthorId = Guid.NewGuid(); // mock, for passing basic validation
 
             var result = DodbGateway.PushDto(dto);
 
             Assert.That(result, Is.Not.Null);
             Assert.That(result is GrDtoSaveSuccess);
+        }
+
+        [Test]
+        public void T007_Sync()
+        {
+            var syncDirectory = Path.Combine(FileSystemUtils.GetDefaultAppDataFolderPath(), "Sync");
+            DodbSyncService.SetSyncDirectoryPath(syncDirectory);
+            FileSystemUtils.ScanDirectoryRecursively(syncDirectory, f => File.Delete(f)); // clean up
+            DodbSyncService.Sync(); // should create 2 files
+
+            var filesList = new List<string>();
+            FileSystemUtils.ScanDirectoryRecursively(syncDirectory, f => filesList.Add(f));
+            Assert.AreEqual(2, filesList.Count);
         }
     }
 }
