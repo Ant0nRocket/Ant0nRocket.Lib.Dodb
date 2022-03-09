@@ -131,8 +131,8 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                 AuthorId = dto.AuthorId,
                 RequiredDocumentId = dto.RequiredDocumentId,
                 DateCreatedUtc = dto.DateCreatedUtc,
-                DtoType = $"{typeof(TPayload)}",
-                DtoPayload = dto.Payload.AsJson()
+                PayloadType = $"{typeof(TPayload)}",
+                Payload = dto.Payload.AsJson()
             };
 
             dbContext.Documents.Add(document);

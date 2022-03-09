@@ -14,6 +14,7 @@ using NUnit.Framework;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace Ant0nRocket.Lib.Dodb.Tests
 {
@@ -118,6 +119,25 @@ namespace Ant0nRocket.Lib.Dodb.Tests
             var filesList = new List<string>();
             FileSystemUtils.ScanDirectoryRecursively(syncDirectory, f => filesList.Add(f));
             Assert.AreEqual(2, filesList.Count);
+        }
+
+        [Test]
+        public void T008_Sync()
+        {
+            // Make sure we have 2 files from prev. test
+            var syncDirectory = Path.Combine(FileSystemUtils.GetDefaultAppDataFolderPath(), "Sync");
+            var filesList = new List<string>();
+            FileSystemUtils.ScanDirectoryRecursively(syncDirectory, f => filesList.Add(f));
+            Assert.AreEqual(2, filesList.Count);
+
+            using var dbContext = new TestDbContext();
+            dbContext.Documents.RemoveRange(dbContext.Documents);
+            dbContext.SaveChanges();
+            Assert.AreEqual(false, dbContext.Documents.Any());
+
+            DodbSyncService.Sync();
+
+            Assert.AreEqual(2, dbContext.Documents.Count());
         }
     }
 }

@@ -1,4 +1,6 @@
-﻿using Ant0nRocket.Lib.Std20.Extensions;
+﻿using Ant0nRocket.Lib.Dodb.Dtos;
+using Ant0nRocket.Lib.Dodb.Entities;
+using Ant0nRocket.Lib.Std20.Extensions;
 using Ant0nRocket.Lib.Std20.IO;
 using Ant0nRocket.Lib.Std20.Logging;
 
@@ -49,29 +51,23 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             var documentsToExportList = GetDocumentsToExportList(knownDocumentIdHashSet, syncDirectoryDocumentsIdAndPath);
             var documentsToImportDict = GetDocumentsToImportDict(knownDocumentIdHashSet, syncDirectoryDocumentsIdAndPath);
             ExportDocuments(documentsToExportList);
-            //ImportDocuments(documentsToImportDict);
+            ImportDocuments(documentsToImportDict);
         }
 
-        private static readonly HashSet<Guid> knownDocumentIdHashSet = new();
 
         /// <summary>
         /// Returnes a HashSet of Id of known documents (existing in database)
         /// </summary>
         private static HashSet<Guid> GetKnownDocumentIdHashSet()
         {
-            if (knownDocumentIdHashSet.Count == 0)
-            {
-                using var dbContext = DodbGateway.GetContext();
-                dbContext
-                    .Documents
-                    .AsNoTracking()
-                    .Where(d => d.IsDeleted == false)
-                    .OrderBy(d => d.DateCreatedUtc)
-                    .Select(d => d.Id)
-                    .ToList()
-                    .ForEach(e => knownDocumentIdHashSet.Add(e));
-            }
-            return knownDocumentIdHashSet;
+            using var dbContext = DodbGateway.GetContext();
+            return dbContext
+                .Documents
+                .AsNoTracking()
+                .Where(d => d.IsDeleted == false)
+                .OrderBy(d => d.DateCreatedUtc)
+                .Select(d => d.Id)
+                .ToHashSet();
         }
 
         /// <summary>
@@ -125,8 +121,6 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
         /// <summary>
         /// Exports specified documents to syncDirectoryPath
         /// </summary>
-        /// <param name="documentsToExportList"></param>
-        /// <exception cref="NotImplementedException"></exception>
         private static void ExportDocuments(IEnumerable<Guid> documentsToExportList)
         {
             using var dbContext = DodbGateway.GetContext();
@@ -140,18 +134,69 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                     .First(); // we are sure it exists
 
                 var documentJsonValue = document.AsJson();
-                var syncDirectorySubFolderPath = document.DateCreatedUtc.ToString("yyyyMMdd");
-                var shortFileName = $"{document.DateCreatedUtc:yyyyMMdd}_{document.DateCreatedUtc:HHmmss}_{document.Id}";
-                var resultPath = Path.Combine(syncDirectoryPath, syncDirectorySubFolderPath, shortFileName);
-                FileSystemUtils.TouchDirectory(resultPath);
+
+                var syncDirectoryWithSubFolderPath = Path.Combine(
+                    syncDirectoryPath,
+                    document.DateCreatedUtc.ToString("yyyyMMdd"));
+
+                if (!FileSystemUtils.TouchDirectory(syncDirectoryWithSubFolderPath))
+                {
+                    logger.LogError($"Can't create directory '{syncDirectoryWithSubFolderPath}'. Sync operation stopped");
+                    return;
+                }
+
+                var shortFileName = $"{document.DateCreatedUtc:yyyyMMdd}_{document.DateCreatedUtc:HHmmss}_{document.Id}.json";
+                var resultPath = Path.Combine(syncDirectoryWithSubFolderPath, shortFileName);
+
                 File.WriteAllText(resultPath, documentJsonValue);
+
                 logger.LogTrace($"Document '{document.Id}' exported to '{resultPath}'");
             }
         }
 
         private static void ImportDocuments(IDictionary<Guid, string> documentsToImportDict)
         {
-            throw new NotImplementedException();
+            foreach (var kvp in documentsToImportDict)
+            {
+                var document = FileSystemUtils.TryReadFromFile<Document>(kvp.Value);
+                if (document.Id != kvp.Key)
+                {
+                    logger.LogWarning($"Id mismatch during deserialization of file '{kvp.Value}'. Skipped");
+                    continue;
+                }
+
+                var payloadType = GetTypeAccrossAppDomain(document.PayloadType);
+                if (payloadType == null)
+                {
+                    logger.LogError($"Type '{document.PayloadType}' from '{document.Id}' doesn't exists in current app domain");
+                    continue;
+                }
+
+                var dto = new DtoOf<object>
+                {
+                    Id = kvp.Key,
+                    AuthorId = document.AuthorId,
+                    RequiredDocumentId = document.RequiredDocumentId,
+                    DateCreatedUtc = document.DateCreatedUtc,
+                    Payload = FileSystemUtils.GetSerializer().Deserialize(document.Payload, payloadType),
+                };
+
+                _ = DodbGateway.PushDto(dto);
+            }
+        }
+
+        private static Type GetTypeAccrossAppDomain(string typeName)
+        {
+            var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+            foreach (var assembly in assemblies)
+            {
+                var types = assembly.GetTypes();
+                var targetType = types.Where(t => t.FullName == typeName).FirstOrDefault();
+                if (targetType != null)
+                    return targetType;
+            }
+
+            return null;
         }
     }
 }
