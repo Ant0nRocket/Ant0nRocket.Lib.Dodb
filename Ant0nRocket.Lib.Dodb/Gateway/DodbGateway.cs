@@ -1,6 +1,7 @@
 ﻿using Ant0nRocket.Lib.Dodb.Abstractions;
 using Ant0nRocket.Lib.Dodb.Dtos;
 using Ant0nRocket.Lib.Dodb.Entities;
+using Ant0nRocket.Lib.Dodb.Gateway.Helpers;
 using Ant0nRocket.Lib.Dodb.Gateway.Responces;
 using Ant0nRocket.Lib.Std20.Extensions;
 using Ant0nRocket.Lib.Std20.Logging;
@@ -50,119 +51,31 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
         #endregion
 
+        #region DTO handler
 
-        public static event Action<object> OnDtoReceived;
+        private static DtoHandler dtoHandler;
+
+        public static void RegisterDtoHandler(DtoHandler handler) => dtoHandler = handler;
+
+        #endregion
 
 
         public static GatewayResponse PushDto<TPayload>(DtoOf<TPayload> dto) where TPayload : class, new()
         {
-            var type = dto.Payload.GetType();
-            if (!DodbDtoHandler.IsHandlerExists(type))
-            {
-                logger.LogError($"Handler of payload-type '{type}' are not registred");
-                return new GrDtoHandlerNotFound() { Value = dto };
-            }
+            // 1. Validate
+            var validator = new DtoValidator<TPayload>(dto).Validate().AndLogErrorsTo(logger);
+            if (validator.HasFoundErrors) return new GrDtoIsInvalid(validator.ErrorsList);
 
-            var validationErrors = ValidatePayload(dto);
-            if (validationErrors.Count > 0)
-            {
-                var validationErrorsJoined = string.Join(", ", validationErrors);
-                logger.LogError(validationErrorsJoined);
-                return new GrDtoIsInvalid(validationErrors);
-            }
-
-            return ApplyDto(dto);
-        }
-
-        private static GatewayResponse ApplyDto<TPayload>(DtoOf<TPayload> dto) where TPayload : class, new()
-        {
+            // 2. Get dbContext
             using var dbContext = GetContext();
 
-            if (dbContext.Documents.AsNoTracking().Any(d => d.Id == dto.Id))
-                return new GrDocumentExists { DocumentId = dto.Id }.WithLogging();
+            // 3. Create document
+            var dtoHandlingResult = new Dto2DocumentConverter()
+                .WithDbContext(dbContext)
+                .CreateDocumentFrom(dto)
+                .AndHandleDtoWith(dtoHandler);
 
-            using var transaction = (dbContext as DbContext).Database.BeginTransaction();
-
-            var dtoSaveResult = TryApplyDtoAndSaveDocument(dto, dbContext);
-
-            if (dtoSaveResult is not GrDtoSaveSuccess)
-            {
-                logger.LogError($"Unable to save DTO '{dto.Id}': {dtoSaveResult.GetType().Name} returned");
-                return dtoSaveResult;
-            }
-
-            try
-            {
-                dbContext.SaveChanges();
-                transaction.Commit();
-                return new GrDtoSaveSuccess { DocumentId = dto.Id }.WithLogging();
-            }
-            catch (Exception ex)
-            {
-                logger.LogException(ex);
-                transaction.Rollback();
-                return new GrDtoSaveFailed { DocumentId = dto.Id }.WithLogging(logLevel: LogLevel.Error);
-            }
-
-        }
-
-        private static GatewayResponse TryApplyDtoAndSaveDocument<TPayload>(DtoOf<TPayload> dto, IDodbContext dbContext) where TPayload : class, new()
-        {
-            if (dto.RequiredDocumentId != default)
-                if (!dbContext.Documents.AsNoTracking().Any(d => d.Id == dto.RequiredDocumentId))
-                {
-                    return new GrRequiredDocumentNotFound
-                    {
-                        RequesterId = dto.Id,
-                        RequiredDocumentId = dto.RequiredDocumentId
-                    }
-                    .WithLogging(logLevel: LogLevel.Error);
-                }
-
-            if (dto.DateCreatedUtc == DateTime.MinValue)
-            {
-                dto.RequiredDocumentId = dbContext
-                    .Documents.AsNoTracking()
-                    .OrderByDescending(d => d.DateCreatedUtc)
-                    .FirstOrDefault()?.Id ?? Guid.Empty;
-                dto.DateCreatedUtc = DateTime.UtcNow;
-            }
-
-            var document = new Document()
-            {
-                Id = dto.Id,
-                AuthorId = dto.AuthorId,
-                RequiredDocumentId = dto.RequiredDocumentId,
-                DateCreatedUtc = dto.DateCreatedUtc,
-                PayloadType = $"{dto.Payload.GetType()}",
-                Payload = dto.Payload.AsJson()
-            };
-
-            dbContext.Documents.Add(document);
-            var dtoHandler = DodbDtoHandler.GetDtoHandler(dto.Payload.GetType());
-            var invokeResult = dtoHandler?.Invoke(dto.Payload, dbContext);
-            return invokeResult;
-        }
-
-        /// <summary>
-        /// Returnes a list of errors inside a payload.<br />
-        /// If the list is empty then there are no errors found.
-        /// </summary>
-        private static List<string> ValidatePayload<TPayload>(DtoOf<TPayload> dto) where TPayload : class, new()
-        {
-            var errorsList = new List<string>();
-
-            // Check basic properties
-            if (dto.Id == Guid.Empty) errorsList.Add($"{nameof(dto.Id)} is not set");
-            if (dto.AuthorId == Guid.Empty) errorsList.Add($"{nameof(dto.AuthorId)} is not set");
-
-            // Check payload using annotations
-            var validationContext = new ValidationContext(dto.Payload);
-            var validationResults = new List<ValidationResult>();
-            if (!Validator.TryValidateObject(dto.Payload, validationContext, validationResults, validateAllProperties: true))
-                validationResults.ForEach(vr => errorsList.Add(vr.ErrorMessage));
-
-            return errorsList;
+            return dtoHandlingResult;
         }
     }
 }

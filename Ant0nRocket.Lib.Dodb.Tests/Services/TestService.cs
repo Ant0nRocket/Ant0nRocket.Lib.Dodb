@@ -15,5 +15,11 @@ namespace Ant0nRocket.Lib.Dodb.Tests.Services
             logger.LogDebug($"some work with TestPayload DTO");
             return new GrDtoSaveSuccess();
         }
+
+        public static GatewayResponse AnnotatedPayloadMethod(AnnotatedPayload dto, IDodbContext context)
+        {
+            logger.LogDebug($"some work with Annotated DTO");
+            return new GrDtoSaveSuccess();
+        }
     }
 }
