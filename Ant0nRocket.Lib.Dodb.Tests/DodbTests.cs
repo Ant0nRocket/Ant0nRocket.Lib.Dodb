@@ -26,8 +26,8 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         public void T001_RegisterGetterAndHandlers()
         {
             DodbGateway.RegisterContextGetter(new Func<IDodbContext>(() => new TestDbContext()));
-            DodbDtoHandler<TestPayload>.RegisterDtoHandler(TestService.TestMethod);
-            DodbDtoHandler<AnnotatedPayload>.RegisterDtoHandler((dto, ctx) => new GrDtoSaveSuccess());
+            DodbDtoHandler.RegisterDtoHandler<TestPayload>(TestService.TestMethod);
+            DodbDtoHandler.RegisterDtoHandler<AnnotatedPayload>((dto, ctx) => new GrDtoSaveSuccess());
 
             Ant0nRocketLibConfig.IsPortableMode = true;
         }
