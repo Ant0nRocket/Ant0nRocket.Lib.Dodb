@@ -15,7 +15,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
         //public static bool IsHandlerExists() => IsHandlerExists(typeof(TPayload));
 
-        public static void RegisterDtoHandler<TPayload>(Func<TPayload, IDodbContext, GatewayResponse> handler)
+        public static void RegisterDtoHandler<TPayload>(ApplyDtoDelegate<TPayload> handler)
         {
             var type = typeof(TPayload);
             if (dtoHandleMap.ContainsKey(type))
@@ -31,7 +31,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
         public static dynamic GetDtoHandler(Type type) =>
             IsHandlerExists(type) ? dtoHandleMap[type] : default;
 
-        public static Func<T, IDodbContext, GatewayResponse> GetDtoHandler<T>()
+        public static ApplyDtoDelegate<T> GetDtoHandler<T>()
         {
             var type = typeof(T);
             if (dtoHandleMap.ContainsKey(type))
