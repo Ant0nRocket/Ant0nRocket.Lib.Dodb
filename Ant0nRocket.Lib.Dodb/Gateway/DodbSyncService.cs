@@ -1,4 +1,5 @@
-﻿using Ant0nRocket.Lib.Dodb.Dtos;
+﻿using Ant0nRocket.Lib.Dodb.Abstractions;
+using Ant0nRocket.Lib.Dodb.Dtos;
 using Ant0nRocket.Lib.Dodb.Entities;
 using Ant0nRocket.Lib.Std20.Extensions;
 using Ant0nRocket.Lib.Std20.IO;
@@ -78,7 +79,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
         {
             const string FILENAME_PATTERN =
                 @"(?<Year>\d{4})(?<Month>\d{2})(?<Day>\d{2})_" +
-                @"(?<Hours>\d{2})(?<Minutes>\d{2})(?<Seconds>\d{2})_" +
+                @"(?<Hours>\d{2})(?<Minutes>\d{2})(?<Seconds>\d{2})(?<MilliSeconds>\d+)_" +
                 @"(?<DocumentId>[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})";
 
             var foundDocumentsIdAndPath = new Dictionary<Guid, string>();
@@ -89,15 +90,6 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                 {
                     var documentId = Guid.Parse(match.Groups["DocumentId"].Value);
                     foundDocumentsIdAndPath.Add(documentId, f);
-
-                    //var year = int.Parse(match.Groups["Year"].Value);
-                    //var month = int.Parse(match.Groups["Month"].Value);
-                    //var day = int.Parse(match.Groups["Day"].Value);
-                    //var hours = int.Parse(match.Groups["Hours"].Value);
-                    //var minutes = int.Parse(match.Groups["Minutes"].Value);
-                    //var seconds = int.Parse(match.Groups["Seconds"].Value);
-                    //var dateUtc = new DateTime(year, month, day, hours, minutes, seconds, DateTimeKind.Utc);
-
                 }
             });
 
@@ -145,7 +137,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                     return;
                 }
 
-                var shortFileName = $"{document.DateCreatedUtc:yyyyMMdd}_{document.DateCreatedUtc:HHmmss}_{document.Id}.json";
+                var shortFileName = $"{document.DateCreatedUtc:yyyyMMdd}_{document.DateCreatedUtc:HHmmssFFFFFFF}_{document.Id}.json";
                 var resultPath = Path.Combine(syncDirectoryWithSubFolderPath, shortFileName);
 
                 File.WriteAllText(resultPath, documentJsonValue);

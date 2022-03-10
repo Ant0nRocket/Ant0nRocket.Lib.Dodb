@@ -51,10 +51,13 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
         #endregion
 
 
+        public static event Action<object> OnDtoReceived;
+
+
         public static GatewayResponse PushDto<TPayload>(DtoOf<TPayload> dto) where TPayload : class, new()
         {
-            var type = typeof(TPayload);
-            if (!DodbDtoHandler<TPayload>.IsHandlerExists())
+            var type = dto.Payload.GetType();
+            if (!DodbDtoHandler<TPayload>.IsHandlerExists(type))
             {
                 logger.LogError($"Handler of payload-type '{type}' are not registred");
                 return new GrDtoHandlerNotFound() { Value = dto };
@@ -131,13 +134,13 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                 AuthorId = dto.AuthorId,
                 RequiredDocumentId = dto.RequiredDocumentId,
                 DateCreatedUtc = dto.DateCreatedUtc,
-                PayloadType = $"{typeof(TPayload)}",
+                PayloadType = $"{dto.Payload.GetType()}",
                 Payload = dto.Payload.AsJson()
             };
 
             dbContext.Documents.Add(document);
 
-            return DodbDtoHandler<TPayload>.GetDtoHandler()?.Invoke(dto, dbContext);
+            return DodbDtoHandler<TPayload>.GetDtoHandler()?.Invoke(dto.Payload, dbContext);
         }
 
         /// <summary>

@@ -2,5 +2,5 @@
 
 namespace Ant0nRocket.Lib.Dodb.Abstractions
 {
-    public delegate GatewayResponse ApplyDtoDelegate<T>(DtoOf<T> dto, IDodbContext context) where T : class, new();
+    public delegate GatewayResponse ApplyDtoDelegate<T>(T dtoPayload, IDodbContext context);
 }

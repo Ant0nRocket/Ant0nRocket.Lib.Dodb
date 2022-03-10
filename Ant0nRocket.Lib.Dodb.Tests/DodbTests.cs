@@ -7,6 +7,7 @@ using Ant0nRocket.Lib.Dodb.Tests.Contexts;
 using Ant0nRocket.Lib.Dodb.Tests.Dto.Payloads;
 using Ant0nRocket.Lib.Dodb.Tests.Entities;
 using Ant0nRocket.Lib.Dodb.Tests.Services;
+using Ant0nRocket.Lib.Std20;
 using Ant0nRocket.Lib.Std20.IO;
 
 using NUnit.Framework;
@@ -27,6 +28,8 @@ namespace Ant0nRocket.Lib.Dodb.Tests
             DodbGateway.RegisterContextGetter(new Func<IDodbContext>(() => new TestDbContext()));
             DodbDtoHandler<TestPayload>.RegisterDtoHandler(TestService.TestMethod);
             DodbDtoHandler<AnnotatedPayload>.RegisterDtoHandler((dto, ctx) => new GrDtoSaveSuccess());
+
+            Ant0nRocketLibConfig.IsPortableMode = true;
         }
 
         [Test]
@@ -138,6 +141,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
             DodbSyncService.Sync();
 
             Assert.AreEqual(2, dbContext.Documents.Count());
+
         }
     }
 }

@@ -18,7 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Ant0nRocket.Lib.Std20" Version="1.5.6" />
+    <PackageReference Include="Ant0nRocket.Lib.Std20" Version="1.5.7" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="6.0.2" />
   </ItemGroup>
 

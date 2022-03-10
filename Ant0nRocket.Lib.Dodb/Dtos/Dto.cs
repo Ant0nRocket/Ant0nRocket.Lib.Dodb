@@ -1,4 +1,6 @@
-﻿namespace Ant0nRocket.Lib.Dodb.Dtos
+﻿using Ant0nRocket.Lib.Dodb.Abstractions;
+
+namespace Ant0nRocket.Lib.Dodb.Dtos
 {
     public class Dto
     {
