@@ -25,29 +25,30 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         [Test]
         public void T001_RegisterGetterAndHandlers()
         {
+            Ant0nRocketLibConfig.IsPortableMode = true;
+
             DodbGateway.RegisterContextGetter(new Func<IDodbContext>(() => new TestDbContext()));
             DodbGateway.RegisterDtoHandler(DtoHandlerMethod);
 
-            Ant0nRocketLibConfig.IsPortableMode = true;
         }
 
-        private GatewayResponse DtoHandlerMethod(DtoOf<object> dto, IDodbContext dbContext)
+        private GatewayResponse DtoHandlerMethod(object dtoPayloadObject, IDodbContext dbContext)
         {
-            return dto.Payload switch
+            return dtoPayloadObject switch
             {
-                TestPayload p => TestService.TestMethod(p, dbContext),
-                AnnotatedPayload p => new GrDtoSaveSuccess(),
-                _ => new GrDtoHandlerNotFound { Value = dto }
+                TestPayload dtoPayload => TestService.TestMethod(dtoPayload, dbContext),
+                AnnotatedPayload p => new GrPushDtoSuccess(),
+                _ => new GrDtoPayloadHandlerNotFound()
             };
         }
 
         [Test]
         public void T002_SendingUnHandledDtoType()
         {
-            var dto = new DtoOf<NotHandledPayload>();
+            var dto = new DtoOf<NotHandledPayload>() { Id = Guid.NewGuid(), AuthorId = Guid.NewGuid() };
             var result = DodbGateway.PushDto(dto);
             Assert.That(result, Is.Not.Null);
-            Assert.That(result is GrDtoHandlerNotFound);
+            Assert.That(result is GrDtoPayloadHandlerNotFound);
         }
 
         [Test]
@@ -97,7 +98,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
             var result = DodbGateway.PushDto(dto);
 
             Assert.That(result, Is.Not.Null);
-            Assert.That(result is GrDtoSaveSuccess);
+            Assert.That(result is GrPushDtoSuccess);
         }
 
         [Test]
@@ -117,7 +118,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
             var result = DodbGateway.PushDto(dto);
 
             Assert.That(result, Is.Not.Null);
-            Assert.That(result is GrDtoSaveSuccess);
+            Assert.That(result is GrPushDtoSuccess);
         }
 
         [Test]

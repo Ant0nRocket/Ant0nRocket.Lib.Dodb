@@ -3,5 +3,5 @@ using Ant0nRocket.Lib.Dodb.Dtos;
 
 namespace Ant0nRocket.Lib.Dodb.Gateway
 {
-    public delegate GatewayResponse DtoHandler(DtoOf<object> dto, IDodbContext dbContext);
+    public delegate GatewayResponse DtoPayloadHandler(object dtoPayload, IDodbContext dbContext);
 }

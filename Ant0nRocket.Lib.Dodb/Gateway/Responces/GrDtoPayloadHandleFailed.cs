@@ -2,11 +2,11 @@
 
 namespace Ant0nRocket.Lib.Dodb.Gateway.Responces
 {
-    public class GrDtoSaveSuccess : GatewayResponse
+    public class GrDtoPayloadHandleFailed : GatewayResponse
     {
         public Guid DocumentId { get; init; }
 
         public override string ToString() =>
-            $"Document '{DocumentId}' successfully saved";
+            $"Unable to save document '{DocumentId}'";
     }
 }
