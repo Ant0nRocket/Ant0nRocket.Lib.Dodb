@@ -125,6 +125,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             {
                 try
                 {
+                    dbContext.SaveChanges();
                     transaction.Commit();
                     logger.LogInformation($"Document '{dto.Id}' saved");
                     return new GrPushDtoSuccess();

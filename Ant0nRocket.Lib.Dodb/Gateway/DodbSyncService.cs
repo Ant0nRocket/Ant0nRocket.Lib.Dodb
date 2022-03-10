@@ -1,6 +1,7 @@
 ﻿using Ant0nRocket.Lib.Dodb.Abstractions;
 using Ant0nRocket.Lib.Dodb.Dtos;
 using Ant0nRocket.Lib.Dodb.Entities;
+using Ant0nRocket.Lib.Dodb.Gateway.Responces;
 using Ant0nRocket.Lib.Std20.Extensions;
 using Ant0nRocket.Lib.Std20.IO;
 using Ant0nRocket.Lib.Std20.Logging;
@@ -173,7 +174,12 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                     Payload = FileSystemUtils.GetSerializer().Deserialize(document.Payload, payloadType),
                 };
 
-                _ = DodbGateway.PushDto(dto);
+                var pushResult = DodbGateway.PushDto(dto);
+
+                if (pushResult is GrPushDtoSuccess)
+                    logger.LogInformation($"Document '{dto.Id}' imported");
+                else
+                    logger.LogError($"Unable to import document from file '{kvp.Value}'. Got '{pushResult.GetType().Name}'");
             }
         }
 

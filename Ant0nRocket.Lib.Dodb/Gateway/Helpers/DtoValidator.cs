@@ -36,8 +36,11 @@ namespace Ant0nRocket.Lib.Dodb.Gateway.Helpers
 
         public DtoValidator<T> AndLogErrorsTo(Logger logger)
         {
-            var errorMessage = string.Join(", ", ErrorsList);
-            logger.LogError($"Validation errors of DTO '{dto.Id}': {errorMessage}");
+            if (ErrorsList.Count > 0)
+            {
+                var errorMessage = string.Join(", ", ErrorsList);
+                logger.LogError($"Validation errors of DTO '{dto.Id}': {errorMessage}");
+            }
             return this;
         }
 

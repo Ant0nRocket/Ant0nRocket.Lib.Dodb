@@ -37,7 +37,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
             return dtoPayloadObject switch
             {
                 TestPayload dtoPayload => TestService.TestMethod(dtoPayload, dbContext),
-                AnnotatedPayload p => new GrPushDtoSuccess(),
+                AnnotatedPayload p => new GrDtoPayloadHandleSuccess(),
                 _ => new GrDtoPayloadHandlerNotFound()
             };
         }
