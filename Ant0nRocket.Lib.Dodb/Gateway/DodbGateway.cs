@@ -8,8 +8,6 @@ using Ant0nRocket.Lib.Std20.Logging;
 
 using Microsoft.EntityFrameworkCore;
 
-using System.ComponentModel.DataAnnotations;
-
 namespace Ant0nRocket.Lib.Dodb.Gateway
 {
     /// <summary>
@@ -23,7 +21,9 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
         static DodbGateway()
         {
+#if DEBUG
             Logger.OnLog += Logger_OnLog;
+#endif
         }
 
         private static void Logger_OnLog(object sender, (DateTime Date, string Message, LogLevel Level, string SenderClassName, string SenderMethodName) e)
