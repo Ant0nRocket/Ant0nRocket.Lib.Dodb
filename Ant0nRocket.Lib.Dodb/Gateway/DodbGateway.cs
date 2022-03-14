@@ -2,7 +2,7 @@
 using Ant0nRocket.Lib.Dodb.Dtos;
 using Ant0nRocket.Lib.Dodb.Entities;
 using Ant0nRocket.Lib.Dodb.Gateway.Helpers;
-using Ant0nRocket.Lib.Dodb.Gateway.Responces;
+using Ant0nRocket.Lib.Dodb.Gateway.Responses;
 using Ant0nRocket.Lib.Std20.Extensions;
 using Ant0nRocket.Lib.Std20.Logging;
 
@@ -59,11 +59,22 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
         #endregion
 
-
+        /// <summary>
+        /// 1. Throws <see cref="NullReferenceException"/> if you forgot to register ContextGetter (see <see cref="RegisterContextGetter(Func{IDodbContext})"/>).<br /> 
+        /// 2. Throws <see cref="NullReferenceException"/> if you forgot to register DtoHandler (see <see cref="RegisterDtoHandler(DtoPayloadHandler)"/>).<br />
+        /// 3. Returnes <see cref="GrDtoIsInvalid"/> if there are some validation errors in DTO or its payload.<br />
+        /// 4. Returnes <see cref="GrDocumentExists"/> if any document with <paramref name="dto"/>.Id already exists.<br />
+        /// 5. Returnes <see cref="GrRequiredDocumentNotFound"/> if there is some document required to exist but not found.<br />
+        /// 6. Returnes <see cref="GrDtoPayloadHandlerNotFound"/> if there is no handler found for payload.<br />
+        /// 7. Returnes <see cref="GrPushDtoFailed"/> if there some errors durring commit.<br />
+        /// <br />
+        /// Othervise returnes some <see cref="GatewayResponse"/>
+        /// </summary>
         public static GatewayResponse PushDto<TPayload>(DtoOf<TPayload> dto) where TPayload : class, new()
         {
             #region 1. Checking handler and validation
 
+            if (contextGetter == default) throw new NullReferenceException(nameof(contextGetter));
             if (dtoPayloadHandler == default) throw new NullReferenceException(nameof(dtoPayloadHandler));
 
             var validator = new DtoValidator<TPayload>(dto).Validate().AndLogErrorsTo(logger);
@@ -121,30 +132,27 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             #region 5. Handling DTO
 
             var dtoHandleResponse = dtoPayloadHandler(dto.Payload, dbContext);
-            if (dtoHandleResponse is GrDtoPayloadHandleSuccess)
+
+            if (dtoHandleResponse is GrDtoPayloadHandlerNotFound)
+            {
+                logger.LogError($"Can't handle payload of DTO '{dto.Id}': no handler found");
+            }
+            else
             {
                 try
                 {
                     dbContext.SaveChanges();
                     transaction.Commit();
                     logger.LogInformation($"Document '{dto.Id}' saved");
-                    return new GrPushDtoSuccess();
                 }
                 catch (Exception ex)
                 {
+                    dtoHandleResponse = new GrPushDtoFailed();
                     logger.LogException(ex, $"Unable to proceed DTO '{dto.Id}'");
                 }
             }
-            else if (dtoHandleResponse is GrDtoPayloadHandlerNotFound)
-            {
-                logger.LogError($"Can't handle payload of DTO '{dto.Id}': no handler found");
-                return dtoHandleResponse;
-            }
 
-
-            // transaction will be auto-rolled back when disposed, but I prefer to do it manually
-            transaction.Rollback();
-            return new GrPushDtoFailed();
+            return dtoHandleResponse;
 
             #endregion
         }

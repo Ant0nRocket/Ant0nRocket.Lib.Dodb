@@ -1,10 +1,12 @@
 ﻿using Ant0nRocket.Lib.Dodb.Abstractions;
+using Ant0nRocket.Lib.Dodb.Attributes;
 using Ant0nRocket.Lib.Dodb.Dtos;
 using Ant0nRocket.Lib.Dodb.Entities;
-using Ant0nRocket.Lib.Dodb.Gateway.Responces;
+using Ant0nRocket.Lib.Dodb.Gateway.Responses;
 using Ant0nRocket.Lib.Std20.Extensions;
 using Ant0nRocket.Lib.Std20.IO;
 using Ant0nRocket.Lib.Std20.Logging;
+using Ant0nRocket.Lib.Std20.Reflection;
 
 using Microsoft.EntityFrameworkCore;
 
@@ -175,11 +177,14 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                 };
 
                 var pushResult = DodbGateway.PushDto(dto);
+                var isPushResultSuccessful = AttributeUtils
+                    .GetAttribute<IsSuccessAttribute>(pushResult.GetType())?.IsSuccess ?? 
+                    true; // by default operation mean to be successful (non-successful are marked in attribute)
 
-                if (pushResult is GrPushDtoSuccess)
+                if (isPushResultSuccessful)
                     logger.LogInformation($"Document '{dto.Id}' imported");
                 else
-                    logger.LogError($"Unable to import document from file '{kvp.Value}'. Got '{pushResult.GetType().Name}'");
+                    logger.LogError($"Unable to import document from file '{kvp.Value}': got '{pushResult.GetType().Name}'");
             }
         }
 

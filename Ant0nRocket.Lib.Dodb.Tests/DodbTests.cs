@@ -2,7 +2,7 @@
 using Ant0nRocket.Lib.Dodb.Abstractions;
 using Ant0nRocket.Lib.Dodb.Dtos;
 using Ant0nRocket.Lib.Dodb.Gateway;
-using Ant0nRocket.Lib.Dodb.Gateway.Responces;
+using Ant0nRocket.Lib.Dodb.Gateway.Responses;
 using Ant0nRocket.Lib.Dodb.Tests.Contexts;
 using Ant0nRocket.Lib.Dodb.Tests.Dto.Payloads;
 using Ant0nRocket.Lib.Dodb.Tests.Entities;
@@ -37,7 +37,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
             return dtoPayloadObject switch
             {
                 TestPayload dtoPayload => TestService.TestMethod(dtoPayload, dbContext),
-                AnnotatedPayload p => new GrDtoPayloadHandleSuccess(),
+                AnnotatedPayload p => new GrOk(),
                 _ => new GrDtoPayloadHandlerNotFound()
             };
         }
@@ -98,7 +98,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
             var result = DodbGateway.PushDto(dto);
 
             Assert.That(result, Is.Not.Null);
-            Assert.That(result is GrPushDtoSuccess);
+            Assert.That(result is GrOk);
         }
 
         [Test]
@@ -118,7 +118,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
             var result = DodbGateway.PushDto(dto);
 
             Assert.That(result, Is.Not.Null);
-            Assert.That(result is GrPushDtoSuccess);
+            Assert.That(result is GrOk);
         }
 
         [Test]

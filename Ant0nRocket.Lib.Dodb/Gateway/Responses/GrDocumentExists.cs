@@ -1,11 +1,13 @@
 ﻿using Ant0nRocket.Lib.Dodb.Abstractions;
+using Ant0nRocket.Lib.Dodb.Attributes;
 
-namespace Ant0nRocket.Lib.Dodb.Gateway.Responces
+namespace Ant0nRocket.Lib.Dodb.Gateway.Responses
 {
     /// <summary>
     /// Returned when <see cref="Lib.Dodb.Entities.Document"/> already exists
     /// in database (by it's Id)
     /// </summary>
+    [IsSuccess(false)]
     public class GrDocumentExists : GatewayResponse
     {
         /// <summary>
