@@ -23,7 +23,9 @@ namespace Ant0nRocket.Lib.Dodb.Gateway.Helpers
 
             // Check basic properties
             if (dto.Id == Guid.Empty) ErrorsList.Add($"{nameof(dto.Id)} is not set");
-            if (dto.AuthorId == Guid.Empty) ErrorsList.Add($"{nameof(dto.AuthorId)} is not set");
+
+            if (DodbConfig.ValidateAuthorId)
+                if (dto.AuthorId == Guid.Empty) ErrorsList.Add($"{nameof(dto.AuthorId)} is not set");
 
             // Check payload using annotations
             var validationContext = new ValidationContext(dto.Payload);
@@ -31,16 +33,6 @@ namespace Ant0nRocket.Lib.Dodb.Gateway.Helpers
             if (!Validator.TryValidateObject(dto.Payload, validationContext, validationResults, validateAllProperties: true))
                 validationResults.ForEach(vr => ErrorsList.Add(vr.ErrorMessage));
 
-            return this;
-        }
-
-        public DtoValidator<T> AndLogErrorsTo(Logger logger)
-        {
-            if (ErrorsList.Count > 0)
-            {
-                var errorMessage = string.Join(", ", ErrorsList);
-                logger.LogError($"Validation errors of DTO '{dto.Id}': {errorMessage}");
-            }
             return this;
         }
 

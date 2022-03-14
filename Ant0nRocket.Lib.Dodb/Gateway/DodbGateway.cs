@@ -22,13 +22,8 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
         static DodbGateway()
         {
 #if DEBUG
-            Logger.OnLog += Logger_OnLog;
+            Logger.LogToBasicLogWritter = true;
 #endif
-        }
-
-        private static void Logger_OnLog(object sender, (DateTime Date, string Message, LogLevel Level, string SenderClassName, string SenderMethodName) e)
-        {
-            BasicLogWritter.WriteToLog(e.Date, e.Message, e.Level, e.SenderClassName, e.SenderMethodName);
         }
 
         #endregion
@@ -77,7 +72,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             if (contextGetter == default) throw new NullReferenceException(nameof(contextGetter));
             if (dtoPayloadHandler == default) throw new NullReferenceException(nameof(dtoPayloadHandler));
 
-            var validator = new DtoValidator<TPayload>(dto).Validate().AndLogErrorsTo(logger);
+            var validator = new DtoValidator<TPayload>(dto).Validate();
             if (validator.HasFoundErrors) return new GrDtoIsInvalid(validator.ErrorsList);
 
             #endregion
@@ -135,7 +130,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
             if (dtoHandleResponse is GrDtoPayloadHandlerNotFound)
             {
-                logger.LogError($"Can't handle payload of DTO '{dto.Id}': no handler found");
+                logger.LogError($"Can't handle payload of DTO '{dto.Id}': no handler found for '{dto.Payload.GetType()}");
             }
             else
             {

@@ -184,7 +184,8 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                 if (isPushResultSuccessful)
                     logger.LogInformation($"Document '{dto.Id}' imported");
                 else
-                    logger.LogError($"Unable to import document from file '{kvp.Value}': got '{pushResult.GetType().Name}'");
+                    logger.LogError($"Unable to import document from file '{kvp.Value}': " +
+                        $"got '{pushResult.GetType().Name}' ({pushResult.AsJson()})");
             }
         }
 

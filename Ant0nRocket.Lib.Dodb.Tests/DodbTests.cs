@@ -122,26 +122,52 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         }
 
         [Test]
-        public void T007_Sync()
+        public void T007_CheckValidationDisableFlag()
         {
-            var syncDirectory = Path.Combine(FileSystemUtils.GetDefaultAppDataFolderPath(), "Sync");
-            DodbSyncService.SetSyncDirectoryPath(syncDirectory);
-            FileSystemUtils.ScanDirectoryRecursively(syncDirectory, f => File.Delete(f)); // clean up
-            DodbSyncService.Sync(); // should create 2 files
+            var dto = new DtoOf<AnnotatedPayload>()
+            {
+                Payload = new()
+                {
+                    SomeIntValue = 15,
+                    SomeStringValue = "SomeO"
+                }
+            };
 
-            var filesList = new List<string>();
-            FileSystemUtils.ScanDirectoryRecursively(syncDirectory, f => filesList.Add(f));
-            Assert.AreEqual(2, filesList.Count);
+            // we didn't assign any author ID
+            DodbConfig.ValidateAuthorId = false;
+
+            var result = DodbGateway.PushDto(dto);
+
+            DodbConfig.ValidateAuthorId = true;
+
+            Assert.That(result, Is.Not.Null);
+            Assert.That(result is GrOk);
         }
 
         [Test]
         public void T008_Sync()
         {
-            // Make sure we have 2 files from prev. test
+            var syncDirectory = Path.Combine(FileSystemUtils.GetDefaultAppDataFolderPath(), "Sync");
+            DodbSyncService.SetSyncDirectoryPath(syncDirectory);
+            FileSystemUtils.ScanDirectoryRecursively(syncDirectory, f => File.Delete(f)); // clean up
+            DodbSyncService.Sync(); // should create 3 files
+
+            var filesList = new List<string>();
+            FileSystemUtils.ScanDirectoryRecursively(syncDirectory, f => filesList.Add(f));
+            Assert.AreEqual(3, filesList.Count);
+        }
+
+        [Test]
+        public void T009_Sync()
+        {
+            // Disable AuthorId check or last document will not be applied
+            DodbConfig.ValidateAuthorId = false;
+
+            // Make sure we have 3 files from prev. test
             var syncDirectory = Path.Combine(FileSystemUtils.GetDefaultAppDataFolderPath(), "Sync");
             var filesList = new List<string>();
             FileSystemUtils.ScanDirectoryRecursively(syncDirectory, f => filesList.Add(f));
-            Assert.AreEqual(2, filesList.Count);
+            Assert.AreEqual(3, filesList.Count);
 
             using var dbContext = new TestDbContext();
             dbContext.Documents.RemoveRange(dbContext.Documents);
@@ -150,8 +176,9 @@ namespace Ant0nRocket.Lib.Dodb.Tests
 
             DodbSyncService.Sync();
 
-            Assert.AreEqual(2, dbContext.Documents.Count());
+            Assert.AreEqual(3, dbContext.Documents.Count());
 
+            DodbConfig.ValidateAuthorId = true;
         }
     }
 }
