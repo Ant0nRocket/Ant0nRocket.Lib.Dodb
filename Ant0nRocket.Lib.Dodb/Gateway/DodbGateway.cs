@@ -1,10 +1,12 @@
 ﻿using Ant0nRocket.Lib.Dodb.Abstractions;
+using Ant0nRocket.Lib.Dodb.Attributes;
 using Ant0nRocket.Lib.Dodb.Dtos;
 using Ant0nRocket.Lib.Dodb.Entities;
 using Ant0nRocket.Lib.Dodb.Gateway.Helpers;
 using Ant0nRocket.Lib.Dodb.Gateway.Responses;
 using Ant0nRocket.Lib.Std20.Extensions;
 using Ant0nRocket.Lib.Std20.Logging;
+using Ant0nRocket.Lib.Std20.Reflection;
 
 using Microsoft.EntityFrameworkCore;
 
@@ -65,7 +67,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
         /// <br />
         /// Othervise returnes some <see cref="GatewayResponse"/>
         /// </summary>
-        public static GatewayResponse PushDto<TPayload>(DtoOf<TPayload> dto) where TPayload : class, new()
+        public static GatewayResponse PushDto<TPayload>(DtoOf<TPayload> dto, Action<Document> onDocumentCreated = default) where TPayload : class, new()
         {
             #region 1. Checking handler and validation
 
@@ -99,46 +101,48 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
             #endregion
 
-            #region 4. Determining DTO source and creating a Document
-
-            if (dto.DateCreatedUtc == DateTime.MinValue) // means that DTO created in app
-            {                                            // because deserialized has some value
-                dto.RequiredDocumentId = dbContext
-                    .Documents.AsNoTracking()
-                    .OrderByDescending(d => d.DateCreatedUtc)
-                    .FirstOrDefault()?.Id ?? Guid.Empty; // As we have a new DTO let's get latest document ID
-                dto.DateCreatedUtc = DateTime.UtcNow;
-            }
-
-            var document = new Document
-            {
-                Id = dto.Id,
-                AuthorId = dto.AuthToken,
-                RequiredDocumentId = dto.RequiredDocumentId,
-                DateCreatedUtc = dto.DateCreatedUtc,
-                PayloadType = $"{dto.Payload.GetType()}",
-                Payload = dto.Payload.AsJson()
-            };
-
-            dbContext.Documents.Add(document);
-
-            #endregion
-
-            #region 5. Handling DTO
+            #region Handling DTO, saving document
 
             var dtoHandleResponse = dtoPayloadHandler(dto.Payload, dbContext);
+            var isDtoHandledSuccessfully = AttributeUtils
+                .GetAttribute<IsSuccessAttribute>(dtoHandleResponse.GetType())?.IsSuccess ?? true;
 
-            if (dtoHandleResponse is GrDtoPayloadHandlerNotFound)
+            if (isDtoHandledSuccessfully == false)
             {
-                logger.LogError($"Can't handle payload of DTO '{dto.Id}': no handler found for '{dto.Payload.GetType()}");
+                logger.LogError($"Can't handle payload of DTO '{dto.Id}': " +
+                    $"got {dtoHandleResponse.GetType().Name} ({dtoHandleResponse.AsJson()})");
             }
             else
             {
                 try
                 {
+                    if (dto.DateCreatedUtc == DateTime.MinValue) // means that DTO created in app
+                    {                                            // because deserialized has some value
+                        dto.RequiredDocumentId = dbContext
+                            .Documents.AsNoTracking()
+                            .OrderByDescending(d => d.DateCreatedUtc)
+                            .FirstOrDefault()?.Id ?? Guid.Empty; // As we have a new DTO let's get latest document ID
+                        dto.DateCreatedUtc = DateTime.UtcNow;
+                    }
+
+                    var document = new Document
+                    {
+                        Id = dto.Id,
+                        // Don't touch AuthorId. We don't know it, and maybe will never know
+                        RequiredDocumentId = dto.RequiredDocumentId,
+                        DateCreatedUtc = dto.DateCreatedUtc,
+                        PayloadType = $"{dto.Payload.GetType()}",
+                        Payload = dto.Payload.AsJson()
+                    };
+
+                    onDocumentCreated?.Invoke(document); // maybe someone out there will need to do something
+
+                    dbContext.Documents.Add(document);
+
                     dbContext.SaveChanges();
                     transaction.Commit();
-                    logger.LogInformation($"Document '{dto.Id}' saved");
+
+                    logger.LogInformation($"DTO '{dto.Id}' applied");
                 }
                 catch (Exception ex)
                 {
@@ -147,9 +151,9 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                 }
             }
 
-            return dtoHandleResponse;
-
             #endregion
+
+            return dtoHandleResponse;
         }
     }
 }
