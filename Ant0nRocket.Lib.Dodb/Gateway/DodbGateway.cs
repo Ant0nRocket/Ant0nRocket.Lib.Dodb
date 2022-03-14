@@ -113,7 +113,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             var document = new Document
             {
                 Id = dto.Id,
-                AuthorId = dto.AuthorId,
+                AuthorId = dto.AuthToken,
                 RequiredDocumentId = dto.RequiredDocumentId,
                 DateCreatedUtc = dto.DateCreatedUtc,
                 PayloadType = $"{dto.Payload.GetType()}",

@@ -45,7 +45,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         [Test]
         public void T002_SendingUnHandledDtoType()
         {
-            var dto = new DtoOf<NotHandledPayload>() { Id = Guid.NewGuid(), AuthorId = Guid.NewGuid() };
+            var dto = new DtoOf<NotHandledPayload>() { Id = Guid.NewGuid(), AuthToken = Guid.NewGuid() };
             var result = DodbGateway.PushDto(dto);
             Assert.That(result, Is.Not.Null);
             Assert.That(result is GrDtoPayloadHandlerNotFound);
@@ -71,7 +71,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
                 } 
             };
 
-            dto.AuthorId = Guid.NewGuid(); // mock, for passing basic validation
+            dto.AuthToken = Guid.NewGuid(); // mock, for passing basic validation
             dto.DateCreatedUtc = DateTime.Now; // same reason
 
             var result = DodbGateway.PushDto(dto);
@@ -93,7 +93,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
                 }
             };
 
-            dto.AuthorId = Guid.NewGuid(); // mock, for passing basic validation
+            dto.AuthToken = Guid.NewGuid(); // mock, for passing basic validation
 
             var result = DodbGateway.PushDto(dto);
 
@@ -113,7 +113,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
                 }
             };
 
-            dto.AuthorId = Guid.NewGuid(); // mock, for passing basic validation
+            dto.AuthToken = Guid.NewGuid(); // mock, for passing basic validation
 
             var result = DodbGateway.PushDto(dto);
 
@@ -134,11 +134,11 @@ namespace Ant0nRocket.Lib.Dodb.Tests
             };
 
             // we didn't assign any author ID
-            DodbConfig.ValidateAuthorId = false;
+            DodbLibConfig.ValidateAuthToken = false;
 
             var result = DodbGateway.PushDto(dto);
 
-            DodbConfig.ValidateAuthorId = true;
+            DodbLibConfig.ValidateAuthToken = true;
 
             Assert.That(result, Is.Not.Null);
             Assert.That(result is GrOk);
@@ -161,7 +161,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         public void T009_Sync()
         {
             // Disable AuthorId check or last document will not be applied
-            DodbConfig.ValidateAuthorId = false;
+            DodbLibConfig.ValidateAuthToken = false;
 
             // Make sure we have 3 files from prev. test
             var syncDirectory = Path.Combine(FileSystemUtils.GetDefaultAppDataFolderPath(), "Sync");
@@ -178,7 +178,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
 
             Assert.AreEqual(3, dbContext.Documents.Count());
 
-            DodbConfig.ValidateAuthorId = true;
+            DodbLibConfig.ValidateAuthToken = true;
         }
     }
 }

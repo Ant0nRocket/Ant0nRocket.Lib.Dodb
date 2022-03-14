@@ -170,7 +170,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                 var dto = new DtoOf<object>
                 {
                     Id = kvp.Key,
-                    AuthorId = document.AuthorId,
+                    AuthToken = document.AuthorId,
                     RequiredDocumentId = document.RequiredDocumentId,
                     DateCreatedUtc = document.DateCreatedUtc,
                     Payload = FileSystemUtils.GetSerializer().Deserialize(document.Payload, payloadType),

@@ -24,8 +24,8 @@ namespace Ant0nRocket.Lib.Dodb.Gateway.Helpers
             // Check basic properties
             if (dto.Id == Guid.Empty) ErrorsList.Add($"{nameof(dto.Id)} is not set");
 
-            if (DodbConfig.ValidateAuthorId)
-                if (dto.AuthorId == Guid.Empty) ErrorsList.Add($"{nameof(dto.AuthorId)} is not set");
+            if (DodbLibConfig.ValidateAuthToken)
+                if (dto.AuthToken == Guid.Empty) ErrorsList.Add($"{nameof(dto.AuthToken)} is not set");
 
             // Check payload using annotations
             var validationContext = new ValidationContext(dto.Payload);

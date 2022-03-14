@@ -10,9 +10,11 @@ namespace Ant0nRocket.Lib.Dodb.Dtos
         public Guid Id { get; set; } = Guid.NewGuid();
 
         /// <summary>
-        /// Id of author of the document.
+        /// Authorization token. If you don't want the gateway
+        /// check this field on every DTO (or sometimes) set
+        /// <see cref="DodbLibConfig.ValidateAuthToken"/> to false.
         /// </summary>
-        public Guid AuthorId { get; set; } = Guid.Empty;
+        public Guid AuthToken { get; set; } = Guid.Empty;
 
         /// <summary>
         /// Requires specified document to exists in database.
