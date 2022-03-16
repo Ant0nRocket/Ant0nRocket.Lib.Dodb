@@ -176,7 +176,13 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                     Payload = FileSystemUtils.GetSerializer().Deserialize(document.Payload, payloadType),
                 };
 
+                var oldValidateAuthToken = DodbLibConfig.ValidateAuthToken;
+                DodbLibConfig.ValidateAuthToken = false; // no need for validation of AuthToken, we already know AuthorId
+
                 var pushResult = DodbGateway.PushDto(dto);
+
+                DodbLibConfig.ValidateAuthToken = oldValidateAuthToken; // set the flag back
+
                 var isPushResultSuccessful = AttributeUtils
                     .GetAttribute<IsSuccessAttribute>(pushResult.GetType())?.IsSuccess ?? 
                     true; // by default operation mean to be successful (non-successful are marked in attribute)
