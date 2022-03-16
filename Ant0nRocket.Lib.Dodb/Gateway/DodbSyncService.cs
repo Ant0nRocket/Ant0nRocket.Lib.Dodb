@@ -28,8 +28,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
         public static void SetSyncDirectoryPath(string value)
         {
             syncDirectoryPath = value;
-            if (!Directory.Exists(syncDirectoryPath))
-                Directory.CreateDirectory(syncDirectoryPath);
+            FileSystemUtils.TouchDirectory(value);
         }
 
         public static void Sync()
@@ -86,6 +85,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                 @"(?<DocumentId>[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})";
 
             var foundDocumentsIdAndPath = new Dictionary<Guid, string>();
+            FileSystemUtils.TouchDirectory(syncDirectoryPath); // just to sure
             FileSystemUtils.ScanDirectoryRecursively(syncDirectoryPath, f =>
             {
                 var match = Regex.Match(f, FILENAME_PATTERN);
