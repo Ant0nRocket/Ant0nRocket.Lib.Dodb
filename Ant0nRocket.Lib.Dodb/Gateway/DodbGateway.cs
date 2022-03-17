@@ -146,7 +146,8 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                 }
                 catch (Exception ex)
                 {
-                    dtoHandleResponse = new GrPushDtoFailed();
+                    var message = $"{ex.Message} " + ex.InnerException?.Message ?? string.Empty;
+                    dtoHandleResponse = new GrPushDtoFailed { Message = message };
                     logger.LogException(ex, $"Unable to proceed DTO '{dto.Id}'");
                 }
             }
