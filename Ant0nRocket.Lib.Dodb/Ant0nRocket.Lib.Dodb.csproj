@@ -6,7 +6,7 @@
     <Nullable>disable</Nullable>
     <PackageProjectUrl>https://github.com/Ant0nRocket/Ant0nRocket.Lib.Dodb</PackageProjectUrl>
     <Copyright>Ant0nRocket</Copyright>
-    <Version>1.1.5</Version>
+    <Version>1.1.6</Version>
     <PackageLicenseExpression>AFL-3.0</PackageLicenseExpression>
   </PropertyGroup>
 
