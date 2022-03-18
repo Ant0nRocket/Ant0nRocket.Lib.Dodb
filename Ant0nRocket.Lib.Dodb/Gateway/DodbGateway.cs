@@ -109,8 +109,8 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
             if (isDtoHandledSuccessfully == false)
             {
-                logger.LogError($"Can't handle payload of DTO '{dto.Id}': " +
-                    $"got {dtoHandleResponse.GetType().Name} ({dtoHandleResponse.AsJson()})");
+                logger.LogError($"Got {dtoHandleResponse.GetType().Name} for DTO '{dto.Id}': " +
+                    $"{dtoHandleResponse.AsJson()}");
             }
             else
             {
