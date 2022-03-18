@@ -133,12 +133,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
                 }
             };
 
-            // we didn't assign any author ID
-            DodbLibConfig.ValidateAuthToken = false;
-
-            var result = DodbGateway.PushDto(dto);
-
-            DodbLibConfig.ValidateAuthToken = true;
+            var result = DodbGateway.PushDto(dto, skipAuthTokenValidation: true);
 
             Assert.That(result, Is.Not.Null);
             Assert.That(result is GrOk);
@@ -160,9 +155,6 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         [Test]
         public void T009_Sync()
         {
-            // Disable AuthorId check or last document will not be applied
-            DodbLibConfig.ValidateAuthToken = false;
-
             // Make sure we have 3 files from prev. test
             var syncDirectory = Path.Combine(FileSystemUtils.GetDefaultAppDataFolderPath(), "Sync");
             var filesList = new List<string>();
@@ -177,8 +169,6 @@ namespace Ant0nRocket.Lib.Dodb.Tests
             DodbSyncService.Sync();
 
             Assert.AreEqual(3, dbContext.Documents.Count());
-
-            DodbLibConfig.ValidateAuthToken = true;
         }
     }
 }

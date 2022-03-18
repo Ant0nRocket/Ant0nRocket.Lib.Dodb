@@ -56,26 +56,12 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
         #endregion
 
-        /// <summary>
-        /// 1. Throws <see cref="NullReferenceException"/> if you forgot to register ContextGetter (see <see cref="RegisterContextGetter(Func{IDodbContext})"/>).<br /> 
-        /// 2. Throws <see cref="NullReferenceException"/> if you forgot to register DtoHandler (see <see cref="RegisterDtoHandler(DtoPayloadHandler)"/>).<br />
-        /// 3. Returnes <see cref="GrDtoIsInvalid"/> if there are some validation errors in DTO or its payload.<br />
-        /// 4. Returnes <see cref="GrDocumentExists"/> if any document with <paramref name="dto"/>.Id already exists.<br />
-        /// 5. Returnes <see cref="GrRequiredDocumentNotFound"/> if there is some document required to exist but not found.<br />
-        /// 6. Returnes <see cref="GrDtoPayloadHandlerNotFound"/> if there is no handler found for payload.<br />
-        /// 7. Returnes <see cref="GrPushDtoFailed"/> if there some errors durring commit.<br />
-        /// <br />
-        /// Othervise returnes some <see cref="GatewayResponse"/>
-        /// </summary>
-        public static GatewayResponse PushDto<TPayload>(DtoOf<TPayload> dto, Action<Document> onDocumentCreated = default) where TPayload : class, new()
+        private static GatewayResponse PushDtoObject<TPayload>(DtoOf<TPayload> dto, Action<Document> onDocumentCreated = default) where TPayload : class, new()
         {
-            #region 1. Checking handler and validation
+            #region 1. Checking handlers
 
             if (contextGetter == default) throw new NullReferenceException(nameof(contextGetter));
             if (dtoPayloadHandler == default) throw new NullReferenceException(nameof(dtoPayloadHandler));
-
-            var validator = new DtoValidator<TPayload>(dto).Validate();
-            if (validator.HasFoundErrors) return new GrDtoIsInvalid(validator.ErrorsList);
 
             #endregion
 
@@ -104,6 +90,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             #region Handling DTO, saving document
 
             var dtoHandleResponse = dtoPayloadHandler(dto.Payload, dbContext);
+
             var isDtoHandledSuccessfully = AttributeUtils
                 .GetAttribute<IsSuccessAttribute>(dtoHandleResponse.GetType())?.IsSuccess ?? true;
 
@@ -111,50 +98,80 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             {
                 logger.LogError($"Got {dtoHandleResponse.GetType().Name} for DTO '{dto.Id}': " +
                     $"{dtoHandleResponse.AsJson()}");
+                return dtoHandleResponse;
             }
-            else
+
+            try
             {
-                try
-                {
-                    if (dto.DateCreatedUtc == DateTime.MinValue) // means that DTO created in app
-                    {                                            // because deserialized has some value
-                        dto.RequiredDocumentId = dbContext
-                            .Documents.AsNoTracking()
-                            .OrderByDescending(d => d.DateCreatedUtc)
-                            .FirstOrDefault()?.Id ?? Guid.Empty; // As we have a new DTO let's get latest document ID
-                        dto.DateCreatedUtc = DateTime.UtcNow;
-                    }
-
-                    var document = new Document
-                    {
-                        Id = dto.Id,
-                        // Don't touch AuthorId. We don't know it, and maybe will never know
-                        RequiredDocumentId = dto.RequiredDocumentId,
-                        DateCreatedUtc = dto.DateCreatedUtc,
-                        PayloadType = $"{dto.Payload.GetType()}",
-                        Payload = dto.Payload.AsJson()
-                    };
-
-                    onDocumentCreated?.Invoke(document); // maybe someone out there will need to do something
-
-                    dbContext.Documents.Add(document);
-
-                    dbContext.SaveChanges();
-                    transaction.Commit();
-
-                    logger.LogInformation($"DTO '{dto.Id}' applied");
+                if (dto.DateCreatedUtc == DateTime.MinValue) // means that DTO created in app
+                {                                            // because deserialized has some value
+                    dto.RequiredDocumentId = dbContext
+                        .Documents.AsNoTracking()
+                        .OrderByDescending(d => d.DateCreatedUtc)
+                        .FirstOrDefault()?.Id ?? Guid.Empty; // As we have a new DTO let's get latest document ID
+                    dto.DateCreatedUtc = DateTime.UtcNow;
                 }
-                catch (Exception ex)
+
+                var document = new Document
                 {
-                    var message = $"{ex.Message} " + ex.InnerException?.Message ?? string.Empty;
-                    dtoHandleResponse = new GrPushDtoFailed { Message = message };
-                    logger.LogException(ex, $"Unable to proceed DTO '{dto.Id}'");
-                }
+                    Id = dto.Id,
+                    // Don't touch AuthorId. We don't know it, and maybe will never know
+                    RequiredDocumentId = dto.RequiredDocumentId,
+                    DateCreatedUtc = dto.DateCreatedUtc,
+                    PayloadType = $"{dto.Payload.GetType()}",
+                    Payload = dto.Payload.AsJson()
+                };
+
+                onDocumentCreated?.Invoke(document); // maybe someone out there will need to do something
+
+                dbContext.Documents.Add(document);
+
+                dbContext.SaveChanges();
+                transaction.Commit();
+
+                logger.LogInformation($"DTO '{dto.Id}' applied");
+            }
+            catch (Exception ex)
+            {
+                var message = $"{ex.Message} " + ex.InnerException?.Message ?? string.Empty;
+                dtoHandleResponse = new GrPushDtoFailed { Message = message };
+                logger.LogException(ex, $"Unable to proceed DTO '{dto.Id}'");
             }
 
             #endregion
 
             return dtoHandleResponse;
+
+        }
+
+
+        /// <summary>
+        /// 1. Throws <see cref="NullReferenceException"/> if you forgot to register ContextGetter (see <see cref="RegisterContextGetter(Func{IDodbContext})"/>).<br /> 
+        /// 2. Throws <see cref="NullReferenceException"/> if you forgot to register DtoHandler (see <see cref="RegisterDtoHandler(DtoPayloadHandler)"/>).<br />
+        /// 3. Returnes <see cref="GrDtoIsInvalid"/> if there are some validation errors in DTO or its payload.<br />
+        /// 4. Returnes <see cref="GrDocumentExists"/> if any document with <paramref name="dto"/>.Id already exists.<br />
+        /// 5. Returnes <see cref="GrRequiredDocumentNotFound"/> if there is some document required to exist but not found.<br />
+        /// 6. Returnes <see cref="GrDtoPayloadHandlerNotFound"/> if there is no handler found for payload.<br />
+        /// 7. Returnes <see cref="GrPushDtoFailed"/> if there some errors durring commit.<br />
+        /// <br />
+        /// Othervise returnes some <see cref="GatewayResponse"/>
+        /// </summary>
+        public static GatewayResponse PushDto<TPayload>(DtoOf<TPayload> dto, bool skipAuthTokenValidation = false, Action<Document> onDocumentCreated = default) where TPayload : class, new()
+        {
+            var validator = new DtoValidator<TPayload>(dto).Validate(skipAuthTokenValidation);
+            if (validator.HasFoundErrors) return new GrDtoIsInvalid(validator.ErrorsList);
+
+            return PushDtoObject(dto, onDocumentCreated);
+        }
+
+        /// <summary>
+        /// The only differense from <see cref="PushDto{TPayload}(DtoOf{TPayload}, Action{Document})"/> is that
+        /// there is no validation. It simply doesn't required, because documents from disk were already
+        /// validated somewhere in the past and written to disk.
+        /// </summary>
+        internal static GatewayResponse PushDtoFromSyncService<TPayload>(DtoOf<TPayload> dto, Action<Document> onDocumentCreated = default) where TPayload : class, new()
+        {
+            return PushDtoObject(dto, onDocumentCreated);
         }
     }
 }

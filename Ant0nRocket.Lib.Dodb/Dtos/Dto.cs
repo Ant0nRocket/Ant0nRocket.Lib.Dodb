@@ -11,8 +11,7 @@ namespace Ant0nRocket.Lib.Dodb.Dtos
 
         /// <summary>
         /// Authorization token. If you don't want the gateway
-        /// check this field on every DTO (or sometimes) set
-        /// <see cref="DodbLibConfig.ValidateAuthToken"/> to false.
+        /// check this field Push with <i>skipAuthTokenValidation</i> set to true.
         /// </summary>
         public Guid AuthToken { get; set; } = Guid.Empty;
 
