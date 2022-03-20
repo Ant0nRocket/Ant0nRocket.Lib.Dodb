@@ -171,7 +171,8 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
         /// </summary>
         internal static GatewayResponse PushDtoFromSyncService<TPayload>(DtoOf<TPayload> dto, Action<Document> onDocumentCreated = default) where TPayload : class, new()
         {
-            return PushDtoObject(dto, onDocumentCreated);
+            // It is VERY important to assign AuthorId = AuthToken when document created
+            return PushDtoObject(dto, d => d.AuthorId = dto.AuthToken);
         }
     }
 }
