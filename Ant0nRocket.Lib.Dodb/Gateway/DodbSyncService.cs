@@ -140,7 +140,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                     return;
                 }
 
-                var shortFileName = $"{document.DateCreatedUtc:yyyyMMdd}_{document.DateCreatedUtc:HHmmssFFFFFFF}_{document.Id}.json";
+                var shortFileName = $"{document.DateCreatedUtc:yyyyMMdd}_{document.DateCreatedUtc:HHmmssfffffff}_{document.Id}.json";
                 var resultPath = Path.Combine(syncDirectoryWithSubFolderPath, shortFileName);
 
                 File.WriteAllText(resultPath, documentJsonValue);
