@@ -38,6 +38,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
             {
                 TestPayload dtoPayload => TestService.TestMethod(dtoPayload, dbContext),
                 AnnotatedPayload p => new GrOk(),
+                ListPayload p => new GrOk(),
                 _ => new GrDtoPayloadHandlerNotFound()
             };
         }
@@ -140,26 +141,52 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         }
 
         [Test]
-        public void T008_Sync()
+        public void T008_ValidationOfLists()
+        {
+            var dto = new DtoOf<ListPayload>();
+            var pushResult = DodbGateway.PushDto(dto, skipAuthTokenValidation: true);
+            Assert.That(pushResult is GrDtoIsInvalid); // no items added
+
+            // Valid
+            dto.Payload.Items.Add(new() { SomeIntValue = 10, SomeStringValue = "12" });
+            pushResult = DodbGateway.PushDto(dto, skipAuthTokenValidation: true);
+            Assert.That(pushResult is GrOk);
+
+            // Invalid
+            dto.Payload.Items.Clear();
+            dto.Payload.Items.Add(new() { SomeIntValue = -10, SomeStringValue = "12" }); // -10 is invalid
+            pushResult = DodbGateway.PushDto(dto, skipAuthTokenValidation: true);
+            Assert.That(pushResult is GrDtoIsInvalid);
+
+            // Invalid + valid = invalid
+            dto.Payload.Items.Clear();
+            dto.Payload.Items.Add(new() { SomeIntValue = 10, SomeStringValue = "12" }); // valid
+            dto.Payload.Items.Add(new() { SomeIntValue = -10, SomeStringValue = "12" }); // valid
+            pushResult = DodbGateway.PushDto(dto, skipAuthTokenValidation: true);
+            Assert.That(pushResult is GrDtoIsInvalid);
+        }
+
+        [Test]
+        public void T998_Sync()
         {
             var syncDirectory = Path.Combine(FileSystemUtils.GetDefaultAppDataFolderPath(), "Sync");
             DodbSyncService.SetSyncDirectoryPath(syncDirectory);
             FileSystemUtils.ScanDirectoryRecursively(syncDirectory, f => File.Delete(f)); // clean up
-            DodbSyncService.Sync(); // should create 3 files
+            DodbSyncService.Sync(); // should create 4 files
 
             var filesList = new List<string>();
             FileSystemUtils.ScanDirectoryRecursively(syncDirectory, f => filesList.Add(f));
-            Assert.AreEqual(3, filesList.Count);
+            Assert.AreEqual(4, filesList.Count);
         }
 
         [Test]
-        public void T009_Sync()
+        public void T999_Sync()
         {
-            // Make sure we have 3 files from prev. test
+            // Make sure we have 4 files from prev. test
             var syncDirectory = Path.Combine(FileSystemUtils.GetDefaultAppDataFolderPath(), "Sync");
             var filesList = new List<string>();
             FileSystemUtils.ScanDirectoryRecursively(syncDirectory, f => filesList.Add(f));
-            Assert.AreEqual(3, filesList.Count);
+            Assert.AreEqual(4, filesList.Count);
 
             using var dbContext = new TestDbContext();
             dbContext.Documents.RemoveRange(dbContext.Documents);
@@ -168,7 +195,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
 
             DodbSyncService.Sync();
 
-            Assert.AreEqual(3, dbContext.Documents.Count());
+            Assert.AreEqual(4, dbContext.Documents.Count());
         }
     }
 }
