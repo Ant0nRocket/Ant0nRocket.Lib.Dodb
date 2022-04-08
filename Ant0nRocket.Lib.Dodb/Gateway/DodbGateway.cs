@@ -56,25 +56,19 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
         #endregion
 
-        private static GatewayResponse PushDtoObject<TPayload>(DtoOf<TPayload> dto, Action<Document> onDocumentCreated = default) where TPayload : class, new()
+        private static GatewayResponse PushDtoObject<TPayload>(DtoOf<TPayload> dto, IDodbContext dbContext, Action<Document> onDocumentCreated = default) where TPayload : class, new()
         {
-            #region 1. Checking handlers
+            #region 1. Checking handlers and values
 
+            if (dbContext == default) throw new ArgumentNullException(nameof(dbContext));
             if (contextGetter == default) throw new NullReferenceException(nameof(contextGetter));
             if (dtoPayloadHandler == default) throw new NullReferenceException(nameof(dtoPayloadHandler));
 
             #endregion
 
-            #region 2. Getting dbContext and begining a new transaction
+            #region 2. Check document doesn't exists, check required document exists
 
-            using var dbContext = GetContext();
-            using var transaction = (dbContext as DbContext).Database.BeginTransaction();
-
-            #endregion
-
-            #region 3. Check document doesn't exists, check required document exists
-
-            if (dbContext.Documents.AsNoTracking().Any(d => d.Id == dto.Id))
+            if (dbContext.Documents.Any(d => d.Id == dto.Id))
                 return new GrDocumentExists { DocumentId = dto.Id };
 
             if (dto.RequiredDocumentId != default) // some document ID required
@@ -123,13 +117,10 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                 };
 
                 onDocumentCreated?.Invoke(document); // maybe someone out there will need to do something
-
                 dbContext.Documents.Add(document);
-
                 dbContext.SaveChanges();
-                transaction.Commit();
 
-                logger.LogInformation($"DTO '{dto.Id}' applied");
+                logger.LogInformation($"[uncommited] DTO '{dto.Id}' applied");
             }
             catch (Exception ex)
             {
@@ -143,6 +134,94 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             return dtoHandleResponse;
 
         }
+
+        //private static GatewayResponse PushDtoObject<TPayload>(DtoOf<TPayload> dto, Action<Document> onDocumentCreated = default) where TPayload : class, new()
+        //{
+        //    #region 1. Checking handlers
+
+        //    if (contextGetter == default) throw new NullReferenceException(nameof(contextGetter));
+        //    if (dtoPayloadHandler == default) throw new NullReferenceException(nameof(dtoPayloadHandler));
+
+        //    #endregion
+
+        //    #region 2. Getting dbContext and begining a new transaction
+
+        //    using var dbContext = GetContext();
+        //    using var transaction = (dbContext as DbContext).Database.BeginTransaction();
+
+        //    #endregion
+
+        //    #region 3. Check document doesn't exists, check required document exists
+
+        //    if (dbContext.Documents.AsNoTracking().Any(d => d.Id == dto.Id))
+        //        return new GrDocumentExists { DocumentId = dto.Id };
+
+        //    if (dto.RequiredDocumentId != default) // some document ID required
+        //        if (!dbContext.Documents.AsNoTracking().Any(d => d.Id == dto.RequiredDocumentId))
+        //            return new GrRequiredDocumentNotFound
+        //            { // if required document is not found - end. Maybe next time it will be there.
+        //                RequesterId = dto.Id,
+        //                RequiredDocumentId = dto.RequiredDocumentId
+        //            };
+
+        //    #endregion
+
+        //    #region Handling DTO, saving document
+
+        //    var dtoHandleResponse = dtoPayloadHandler(dto.Payload, dbContext);
+
+        //    var isDtoHandledSuccessfully = AttributeUtils
+        //        .GetAttribute<IsSuccessAttribute>(dtoHandleResponse.GetType())?.IsSuccess ?? true;
+
+        //    if (isDtoHandledSuccessfully == false)
+        //    {
+        //        logger.LogError($"Got {dtoHandleResponse.GetType().Name} for DTO '{dto.Id}': " +
+        //            $"{dtoHandleResponse.AsJson()}");
+        //        return dtoHandleResponse;
+        //    }
+
+        //    try
+        //    {
+        //        if (dto.DateCreatedUtc == DateTime.MinValue) // means that DTO created in app
+        //        {                                            // because deserialized has some value
+        //            dto.RequiredDocumentId = dbContext
+        //                .Documents.AsNoTracking()
+        //                .OrderByDescending(d => d.DateCreatedUtc)
+        //                .FirstOrDefault()?.Id ?? Guid.Empty; // As we have a new DTO let's get latest document ID
+        //            dto.DateCreatedUtc = DateTime.UtcNow;
+        //        }
+
+        //        var document = new Document
+        //        {
+        //            Id = dto.Id,
+        //            // Don't touch AuthorId. We don't know it, and maybe will never know
+        //            RequiredDocumentId = dto.RequiredDocumentId,
+        //            DateCreatedUtc = dto.DateCreatedUtc,
+        //            PayloadType = $"{dto.Payload.GetType()}",
+        //            Payload = dto.Payload.AsJson()
+        //        };
+
+        //        onDocumentCreated?.Invoke(document); // maybe someone out there will need to do something
+
+        //        dbContext.Documents.Add(document);
+
+        //        dbContext.SaveChanges();
+        //        transaction.Commit();
+
+        //        logger.LogInformation($"DTO '{dto.Id}' applied");
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        var message = $"{ex.Message} " + ex.InnerException?.Message ?? string.Empty;
+        //        dtoHandleResponse = new GrPushDtoFailed { Message = message };
+        //        logger.LogException(ex, $"Unable to proceed DTO '{dto.Id}'");
+        //    }
+
+        //    #endregion
+
+        //    return dtoHandleResponse;
+
+        //}
 
 
         /// <summary>
@@ -161,7 +240,9 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             var validator = new DtoValidator<TPayload>(dto).Validate(skipAuthTokenValidation);
             if (validator.HasFoundErrors) return new GrDtoIsInvalid(validator.ErrorsList);
 
-            return PushDtoObject(dto, onDocumentCreated);
+            using var dbContext = GetContext();
+
+            return PushDtoObject(dto, dbContext: dbContext, onDocumentCreated: onDocumentCreated);
         }
 
         /// <summary>
@@ -171,8 +252,10 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
         /// </summary>
         internal static GatewayResponse PushDtoFromSyncService<TPayload>(DtoOf<TPayload> dto, Action<Document> onDocumentCreated = default) where TPayload : class, new()
         {
+            using var dbContext = GetContext();
+
             // It is VERY important to assign AuthorId = AuthToken when document created
-            return PushDtoObject(dto, d => d.AuthorId = dto.AuthToken);
+            return PushDtoObject(dto, dbContext: dbContext, onDocumentCreated: d => d.AuthorId = dto.AuthToken);
         }
     }
 }
