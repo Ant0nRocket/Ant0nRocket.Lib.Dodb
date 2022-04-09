@@ -9,6 +9,7 @@ using Ant0nRocket.Lib.Dodb.Tests.Entities;
 using Ant0nRocket.Lib.Dodb.Tests.Services;
 using Ant0nRocket.Lib.Std20;
 using Ant0nRocket.Lib.Std20.IO;
+using Ant0nRocket.Lib.Std20.Logging;
 
 using NUnit.Framework;
 
@@ -26,6 +27,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         public void T001_RegisterGetterAndHandlers()
         {
             Ant0nRocketLibConfig.IsPortableMode = true;
+            Logger.LogToBasicLogWritter = true;
 
             DodbGateway.RegisterContextGetter(new Func<IDodbContext>(() => new TestDbContext()));
             DodbGateway.RegisterDtoHandler(DtoHandlerMethod);

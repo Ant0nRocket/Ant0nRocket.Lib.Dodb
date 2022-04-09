@@ -176,7 +176,10 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                     Payload = FileSystemUtils.GetSerializer().Deserialize(document.Payload, payloadType),
                 };
 
-                var pushResult = DodbGateway.PushDtoFromSyncService(dto);
+                var pushResult = DodbGateway.PushDto(
+                    dto: dto, 
+                    skipAuthTokenValidation: true,
+                    onDocumentCreated: d => d.AuthorId = dto.AuthToken);
 
                 var isPushResultSuccessful = AttributeUtils
                     .GetAttribute<IsSuccessAttribute>(pushResult.GetType())?.IsSuccess ?? 
