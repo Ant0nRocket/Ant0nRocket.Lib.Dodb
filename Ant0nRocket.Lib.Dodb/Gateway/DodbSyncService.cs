@@ -1,16 +1,14 @@
-﻿using Ant0nRocket.Lib.Dodb.Abstractions;
+﻿using System.Text.RegularExpressions;
+
 using Ant0nRocket.Lib.Dodb.Attributes;
 using Ant0nRocket.Lib.Dodb.Dtos;
 using Ant0nRocket.Lib.Dodb.Entities;
-using Ant0nRocket.Lib.Dodb.Gateway.Responses;
 using Ant0nRocket.Lib.Std20.Extensions;
 using Ant0nRocket.Lib.Std20.IO;
 using Ant0nRocket.Lib.Std20.Logging;
 using Ant0nRocket.Lib.Std20.Reflection;
 
 using Microsoft.EntityFrameworkCore;
-
-using System.Text.RegularExpressions;
 
 namespace Ant0nRocket.Lib.Dodb.Gateway
 {
@@ -49,7 +47,8 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
         private static void PerformSyncIteration()
         {
-            var knownDocumentIdHashSet = GetKnownDocumentIdHashSet();
+            var workingDate = ScanSyncDirectoryAndFindMinimumExportDate();
+            var knownDocumentIdHashSet = GetKnownDocumentIdHashSet(workingDate);
             var syncDirectoryDocumentsIdAndPath = GetSyncDirectoryDocumentsIdAndPath();
             var documentsToExportList = GetDocumentsToExportList(knownDocumentIdHashSet, syncDirectoryDocumentsIdAndPath);
             var documentsToImportDict = GetDocumentsToImportDict(knownDocumentIdHashSet, syncDirectoryDocumentsIdAndPath);
@@ -57,17 +56,53 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             ImportDocuments(documentsToImportDict);
         }
 
+        private static DateTime ScanSyncDirectoryAndFindMinimumExportDate()
+        {
+            const string FILENAME_PATTERN =
+                @"(?<YearFrom>\d{4})(?<MonthFrom>\d{2})(?<DayFrom>\d{2})_(?<YearTo>\d{4})(?<MonthTo>\d{2})(?<DayTo>\d{2})\.(zip|7z)";
+
+            var result = DateTime.MinValue;
+
+            FileSystemUtils.ScanDirectoryRecursively(syncDirectoryPath, f =>
+            {
+                var match = Regex.Match(f, FILENAME_PATTERN);
+                if (match.Success)
+                {
+                    var year = int.Parse(match.Groups["YearTo"].Value);
+                    var month = int.Parse(match.Groups["MonthTo"].Value);
+                    var day = int.Parse(match.Groups["DayTo"].Value);
+                    var tempDate = new DateTime(
+                        year: year,
+                        month: month,
+                        day: day,
+                        hour: 23,
+                        minute: 59,
+                        second: 59,
+                        millisecond: 999,
+                        DateTimeKind.Utc
+                        );
+                    if (tempDate > result) result = tempDate;
+
+#if DEBUG
+                    logger.LogDebug($"Archive till '{tempDate}' found.");
+#endif
+                }
+            });
+
+            return result;
+        }
+
 
         /// <summary>
         /// Returnes a HashSet of Id of known documents (existing in database)
         /// </summary>
-        private static HashSet<Guid> GetKnownDocumentIdHashSet()
+        private static HashSet<Guid> GetKnownDocumentIdHashSet(DateTime fromDate)
         {
             using var dbContext = DodbGateway.GetContext();
             return dbContext
                 .Documents
                 .AsNoTracking()
-                .Where(d => d.IsDeleted == false)
+                .Where(d => d.DateCreatedUtc > fromDate && d.IsDeleted == false)
                 .OrderBy(d => d.DateCreatedUtc)
                 .Select(d => d.Id)
                 .ToHashSet();
