@@ -6,7 +6,7 @@
     <Nullable>disable</Nullable>
     <PackageProjectUrl>https://github.com/Ant0nRocket/Ant0nRocket.Lib.Dodb</PackageProjectUrl>
     <Copyright>Ant0nRocket</Copyright>
-    <Version>1.1.12.4</Version>
+    <Version>1.1.12.5</Version>
     <PackageLicenseExpression>AFL-3.0</PackageLicenseExpression>
   </PropertyGroup>
 
@@ -17,8 +17,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Ant0nRocket.Lib.Std20" Version="1.6.4" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="6.0.4" />
+    <PackageReference Include="Ant0nRocket.Lib.Std20" Version="1.6.5" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="6.0.5" />
   </ItemGroup>
 
 </Project>
