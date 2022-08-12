@@ -64,24 +64,41 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         }
 
         [Test]
-        public void T004_SendingDtoWithAnnotationValidationErrors()
+        public void T004_1_SendingDtoWithAnnotationValidationErrors()
         {
-            var dto = new DtoOf<AnnotatedPayload>() { 
-                Payload = new() 
-                { 
-                    SomeIntValue = -10, 
-                    SomeStringValue = "Hello world" 
-                } 
+            var dto = new DtoOf<AnnotatedPayload>
+            {
+                Payload = new()
+                {
+                    SomeIntValue = -10,
+                    SomeStringValue = "Hello world"
+                },
+                AuthToken = Guid.NewGuid(), // mock, for passing basic validation
+                DateCreatedUtc = DateTime.Now // same reason
             };
-
-            dto.AuthToken = Guid.NewGuid(); // mock, for passing basic validation
-            dto.DateCreatedUtc = DateTime.Now; // same reason
 
             var result = DodbGateway.PushDto(dto);
 
             Assert.That(result, Is.Not.Null);
             Assert.That(result is GrDtoIsInvalid);
             Assert.That((result as GrDtoIsInvalid).Errors.Count == 2);
+        }
+
+        [Test]
+        public void T004_2_SendingDtoWithIValidatableImplementation()
+        {
+            var dto = new DtoOf<ValidatablePayload>
+            {
+                Payload = new() { TestValue = 11 },
+                AuthToken = Guid.NewGuid(), // mock, for passing basic validation
+                DateCreatedUtc = DateTime.Now // same reason
+            };
+
+            var result = DodbGateway.PushDto(dto);
+
+            Assert.That(result, Is.Not.Null);
+            Assert.That(result is GrDtoIsInvalid);
+            Assert.That((result as GrDtoIsInvalid).Errors.Count == 1);
         }
 
         [Test]

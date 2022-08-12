@@ -1,7 +1,7 @@
-﻿using Ant0nRocket.Lib.Dodb.Dtos;
-using Ant0nRocket.Lib.Std20.Logging;
+﻿using System.ComponentModel.DataAnnotations;
 
-using System.ComponentModel.DataAnnotations;
+using Ant0nRocket.Lib.Dodb.Abstractions;
+using Ant0nRocket.Lib.Dodb.Dtos;
 
 namespace Ant0nRocket.Lib.Dodb.Gateway.Helpers
 {
@@ -33,6 +33,10 @@ namespace Ant0nRocket.Lib.Dodb.Gateway.Helpers
             var validationResults = new List<ValidationResult>();
             if (!Validator.TryValidateObject(dto.Payload, validationContext, validationResults, validateAllProperties: true))
                 validationResults.ForEach(vr => ErrorsList.Add(vr.ErrorMessage));
+
+            var typeOfPayload = typeof(T);
+            if (dto.Payload is IValidateablePayload validateablePayload)
+                validateablePayload.Validate(ErrorsList);
 
             return this;
         }
