@@ -27,11 +27,11 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         public void T001_RegisterGetterAndHandlers()
         {
             Ant0nRocketLibConfig.IsPortableMode = true;
+            BasicLogWritter.LogFileNamePrefix = "EkChuaj.Tests_";
             Logger.LogToBasicLogWritter = true;
 
             DodbGateway.RegisterContextGetter(new Func<IDodbContext>(() => new TestDbContext()));
             DodbGateway.RegisterDtoHandler(DtoHandlerMethod);
-
         }
 
         private GatewayResponse DtoHandlerMethod(object dtoPayloadObject, IDodbContext dbContext)
@@ -186,7 +186,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         }
 
         [Test]
-        public void T998_Sync()
+        public void T009_CleanupSyncDirectoryAndSyncAgain()
         {
             var syncDirectory = Path.Combine(FileSystemUtils.GetDefaultAppDataFolderPath(), "Sync");
             FileSystemUtils.ScanDirectoryRecursively(syncDirectory, f => File.Delete(f)); // clean up
@@ -198,7 +198,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         }
 
         [Test]
-        public void T999_Sync()
+        public void T010_CheckSyncPopulateDatabase()
         {
             // Make sure we have 4 files from prev. test
             var syncDirectory = Path.Combine(FileSystemUtils.GetDefaultAppDataFolderPath(), "Sync");
@@ -214,6 +214,26 @@ namespace Ant0nRocket.Lib.Dodb.Tests
             DodbSyncService.SyncDocuments(syncDirectory);
 
             Assert.AreEqual(4, dbContext.Documents.Count());
+        }
+
+        [Test]
+        public void T011_TryLoadPlugin()
+        {
+            var fn = BasicLogWritter.CurrentFileName;
+
+            var pluginLaunched = false;
+            var pluginWorkComplete = false;
+            var pluginError = false;
+
+            DodbSyncService.OnSyncPluginBeforeLaunch += (s, e) => pluginLaunched = true;
+            DodbSyncService.OnSyncPluginWorkComplete += (s, e) => pluginWorkComplete = true;
+            DodbSyncService.OnSyncPluginError += (s, e) => pluginError = true;
+
+            DodbSyncService.SyncPlugins();
+
+            Assert.That(pluginLaunched);
+            Assert.That(pluginWorkComplete);
+            Assert.That(pluginError is false);
         }
     }
 }

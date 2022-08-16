@@ -1,8 +1,10 @@
 ﻿using System.Text.RegularExpressions;
 
+using Ant0nRocket.Lib.Dodb.Abstractions;
 using Ant0nRocket.Lib.Dodb.Attributes;
 using Ant0nRocket.Lib.Dodb.Dtos;
 using Ant0nRocket.Lib.Dodb.Entities;
+using Ant0nRocket.Lib.Dodb.EventArgs;
 using Ant0nRocket.Lib.Std20.Extensions;
 using Ant0nRocket.Lib.Std20.IO;
 using Ant0nRocket.Lib.Std20.Logging;
@@ -52,7 +54,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             var documentIdsToExportList = GetDocumentIdsToExportList(knownDocumentIds, exportedDocumentsIdAndPathDict);
 
             var documentIdAndPathToImportDict = GetDocumentIdAndPathToImportDict(
-                knownDocumentIds, 
+                knownDocumentIds,
                 exportedDocumentsIdAndPathDict);
 
             ExportDocuments(documentIdsToExportList, syncDocumentsDirectoryPath);
@@ -269,9 +271,31 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
         #region Sync plugins
 
+        public static event EventHandler<IDodbSyncServicePlugin> OnSyncPluginBeforeLaunch;
+        public static event EventHandler<IDodbSyncServicePlugin> OnSyncPluginWorkComplete;
+        public static event EventHandler<SyncPluginErrorEventArgs> OnSyncPluginError;
+
         public static void SyncPlugins()
         {
-            
+            var knownPluginsTypes = ReflectionUtils.GetClassesThatImplementsInterface<IDodbSyncServicePlugin>();
+            foreach (var pluginType in knownPluginsTypes)
+            {
+                var pluginInstance = (IDodbSyncServicePlugin)Activator.CreateInstance(pluginType);
+                logger.LogInformation($"Found plugin '{pluginInstance.Name}'. Ready state: {pluginInstance.IsReady}.");
+                logger.LogInformation($"Starting Sync method of plugin '{pluginInstance.Name}'");
+
+                try
+                {
+                    OnSyncPluginBeforeLaunch?.Invoke(null, pluginInstance);
+                    pluginInstance.Sync();
+                    OnSyncPluginWorkComplete?.Invoke(null, pluginInstance);
+                }
+                catch (Exception ex)
+                {                    
+                    logger.LogException(ex);
+                    OnSyncPluginError?.Invoke(null, new SyncPluginErrorEventArgs { Plugin = pluginInstance, Exception = ex });
+                }
+            }
         }
 
         #endregion

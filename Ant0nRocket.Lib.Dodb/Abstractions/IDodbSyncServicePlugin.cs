@@ -3,5 +3,9 @@
     public interface IDodbSyncServicePlugin
     {
         void Sync();
+
+        bool IsReady { get; }
+
+        string Name { get; }
     }
 }

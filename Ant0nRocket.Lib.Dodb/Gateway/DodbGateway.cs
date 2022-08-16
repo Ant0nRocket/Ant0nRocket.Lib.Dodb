@@ -21,13 +21,6 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
         private static readonly Logger logger = Logger.Create(nameof(DodbGateway));
 
-        static DodbGateway()
-        {
-#if DEBUG
-            Logger.LogToBasicLogWritter = true;
-#endif
-        }
-
         #endregion
 
         #region DbContext getter
