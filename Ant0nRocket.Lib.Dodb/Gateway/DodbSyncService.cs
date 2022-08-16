@@ -232,7 +232,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                     continue;
                 }
 
-                var payloadType = AttributeUtils.FindTypeAccrossAppDomain(document.PayloadType);
+                var payloadType = ReflectionUtils.FindTypeAccrossAppDomain(document.PayloadType);
                 if (payloadType == null)
                 {
                     logger.LogError($"Type '{document.PayloadType}' from '{document.Id}' doesn't exists in current app domain");
