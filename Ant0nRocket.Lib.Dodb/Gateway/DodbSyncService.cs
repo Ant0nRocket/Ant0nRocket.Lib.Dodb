@@ -287,7 +287,14 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                 try
                 {
                     OnSyncPluginBeforeLaunch?.Invoke(null, pluginInstance);
-                    pluginInstance.Sync();
+                    if (pluginInstance.IsReady)
+                    {
+                        pluginInstance.Sync();
+                    }
+                    else
+                    {
+                        logger.LogWarning($"Plugin '{pluginInstance.Name}' is not ready. Skip sync action.");
+                    }
                     OnSyncPluginWorkComplete?.Invoke(null, pluginInstance);
                 }
                 catch (Exception ex)
