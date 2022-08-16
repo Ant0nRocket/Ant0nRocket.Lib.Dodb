@@ -6,6 +6,6 @@ namespace Ant0nRocket.Lib.Dodb.Gateway.Responses
     [IsSuccess(false)]
     public class GrPushDtoFailed : GatewayResponse
     {
-        public override string Message { get; set; }
+        public string Message { get; set; }
     }
 }

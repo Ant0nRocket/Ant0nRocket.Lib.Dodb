@@ -2,6 +2,5 @@
 {
     public abstract class GatewayResponse
     {
-        public virtual string Message { get; set; } = string.Empty;
     }
 }
