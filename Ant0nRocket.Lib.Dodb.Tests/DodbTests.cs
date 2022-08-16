@@ -1,6 +1,6 @@
-﻿
-using Ant0nRocket.Lib.Dodb.Abstractions;
+﻿using Ant0nRocket.Lib.Dodb.Abstractions;
 using Ant0nRocket.Lib.Dodb.Dtos;
+using Ant0nRocket.Lib.Dodb.Entities;
 using Ant0nRocket.Lib.Dodb.Gateway;
 using Ant0nRocket.Lib.Dodb.Gateway.Responses;
 using Ant0nRocket.Lib.Dodb.Tests.Contexts;
@@ -30,7 +30,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
             BasicLogWritter.LogFileNamePrefix = "EkChuaj.Tests_";
             Logger.LogToBasicLogWritter = true;
 
-            DodbGateway.RegisterContextGetter(new Func<IDodbContext>(() => new TestDbContext()));
+            DodbGateway.RegisterDbContextGetterFunc(new Func<IDodbContext>(() => new TestDbContext()));
             DodbGateway.RegisterDtoHandler(DtoHandlerMethod);
         }
 
@@ -39,23 +39,43 @@ namespace Ant0nRocket.Lib.Dodb.Tests
             return dtoPayloadObject switch
             {
                 TestPayload dtoPayload => TestService.TestMethod(dtoPayload, dbContext),
-                AnnotatedPayload p => new GrOk(),
-                ListPayload p => new GrOk(),
+                AnnotatedPayload => new GrOk(),
+                ListPayload => new GrOk(),
                 _ => new GrDtoPayloadHandlerNotFound()
             };
         }
 
+        private User rootUser;
+
         [Test]
-        public void T002_SendingUnHandledDtoType()
+        public void T002_CreatingRootUser()
         {
-            var dto = new DtoOf<NotHandledPayload>() { Id = Guid.NewGuid(), AuthToken = Guid.NewGuid() };
+            rootUser = DodbGateway.CreateRootUser("root");
+            Assert.That(rootUser is not null);
+            rootUser = null;
+        }
+
+        [Test]
+        public void T003_AuthAsRoot()
+        {
+            Assert.That(rootUser is null); // should be null from prev. test
+            rootUser = DodbGateway.AuthAsRoot("root2"); // wrong password
+            Assert.That(rootUser is null);
+            rootUser = DodbGateway.AuthAsRoot("root"); // correct
+            Assert.That(rootUser is not null);
+        }
+
+        [Test]
+        public void T004_SendingUnHandledDtoType()
+        {
+            var dto = new DtoOf<NotHandledPayload>() { Id = Guid.NewGuid(), UserId = Guid.NewGuid() };
             var result = DodbGateway.PushDto(dto);
             Assert.That(result, Is.Not.Null);
             Assert.That(result is GrDtoPayloadHandlerNotFound);
         }
 
         [Test]
-        public void T003_SendingDtoWithInvalidDtoProperties()
+        public void T005_SendingDtoWithInvalidDtoProperties()
         {
             var dto = new DtoOf<TestPayload>() { Id = Guid.Empty };
             var result = DodbGateway.PushDto(dto);
@@ -64,7 +84,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         }
 
         [Test]
-        public void T004_1_SendingDtoWithAnnotationValidationErrors()
+        public void T006_1_SendingDtoWithAnnotationValidationErrors()
         {
             var dto = new DtoOf<AnnotatedPayload>
             {
@@ -73,7 +93,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
                     SomeIntValue = -10,
                     SomeStringValue = "Hello world"
                 },
-                AuthToken = Guid.NewGuid(), // mock, for passing basic validation
+                UserId = Guid.NewGuid(), // mock, for passing basic validation
                 DateCreatedUtc = DateTime.Now // same reason
             };
 
@@ -85,12 +105,12 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         }
 
         [Test]
-        public void T004_2_SendingDtoWithIValidatableImplementation()
+        public void T007_2_SendingDtoWithIValidatableImplementation()
         {
             var dto = new DtoOf<ValidatablePayload>
             {
                 Payload = new() { TestValue = 11 },
-                AuthToken = Guid.NewGuid(), // mock, for passing basic validation
+                UserId = Guid.NewGuid(), // mock, for passing basic validation
                 DateCreatedUtc = DateTime.Now // same reason
             };
 
@@ -102,10 +122,11 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         }
 
         [Test]
-        public void T005_SendValidDto()
+        public void T008_SendValidDto()
         {
             var dto = new DtoOf<AnnotatedPayload>()
             {
+                UserId = rootUser.Id,
                 Payload = new()
                 {
                     SomeIntValue = 0,
@@ -113,8 +134,6 @@ namespace Ant0nRocket.Lib.Dodb.Tests
                 }
             };
 
-            dto.AuthToken = Guid.NewGuid(); // mock, for passing basic validation
-
             var result = DodbGateway.PushDto(dto);
 
             Assert.That(result, Is.Not.Null);
@@ -122,10 +141,11 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         }
 
         [Test]
-        public void T006_SendAnotherValidDto()
+        public void T009_SendAnotherValidDto()
         {
             var dto = new DtoOf<AnnotatedPayload>()
             {
+                UserId = rootUser.Id,
                 Payload = new()
                 {
                     SomeIntValue = 19,
@@ -133,7 +153,24 @@ namespace Ant0nRocket.Lib.Dodb.Tests
                 }
             };
 
-            dto.AuthToken = Guid.NewGuid(); // mock, for passing basic validation
+            var result = DodbGateway.PushDto(dto);
+
+            Assert.That(result, Is.Not.Null);
+            Assert.That(result is GrOk);
+        }
+
+        [Test]
+        public void T010_CheckValidationDisableFlag()
+        {
+            var dto = new DtoOf<AnnotatedPayload>()
+            {
+                UserId = rootUser.Id,
+                Payload = new()
+                {
+                    SomeIntValue = 15,
+                    SomeStringValue = "SomeO"
+                }
+            };
 
             var result = DodbGateway.PushDto(dto);
 
@@ -142,51 +179,33 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         }
 
         [Test]
-        public void T007_CheckValidationDisableFlag()
+        public void T011_ValidationOfLists()
         {
-            var dto = new DtoOf<AnnotatedPayload>()
-            {
-                Payload = new()
-                {
-                    SomeIntValue = 15,
-                    SomeStringValue = "SomeO"
-                }
-            };
-
-            var result = DodbGateway.PushDto(dto, skipAuthTokenValidation: true);
-
-            Assert.That(result, Is.Not.Null);
-            Assert.That(result is GrOk);
-        }
-
-        [Test]
-        public void T008_ValidationOfLists()
-        {
-            var dto = new DtoOf<ListPayload>();
-            var pushResult = DodbGateway.PushDto(dto, skipAuthTokenValidation: true);
+            var dto = new DtoOf<ListPayload>() { UserId = rootUser.Id };
+            var pushResult = DodbGateway.PushDto(dto);
             Assert.That(pushResult is GrDtoIsInvalid); // no items added
 
             // Valid
             dto.Payload.Items.Add(new() { SomeIntValue = 10, SomeStringValue = "12" });
-            pushResult = DodbGateway.PushDto(dto, skipAuthTokenValidation: true);
+            pushResult = DodbGateway.PushDto(dto);
             Assert.That(pushResult is GrOk);
 
             // Invalid
             dto.Payload.Items.Clear();
             dto.Payload.Items.Add(new() { SomeIntValue = -10, SomeStringValue = "12" }); // -10 is invalid
-            pushResult = DodbGateway.PushDto(dto, skipAuthTokenValidation: true);
+            pushResult = DodbGateway.PushDto(dto);
             Assert.That(pushResult is GrDtoIsInvalid);
 
             // Invalid + valid = invalid
             dto.Payload.Items.Clear();
             dto.Payload.Items.Add(new() { SomeIntValue = 10, SomeStringValue = "12" }); // valid
             dto.Payload.Items.Add(new() { SomeIntValue = -10, SomeStringValue = "12" }); // valid
-            pushResult = DodbGateway.PushDto(dto, skipAuthTokenValidation: true);
+            pushResult = DodbGateway.PushDto(dto);
             Assert.That(pushResult is GrDtoIsInvalid);
         }
 
         [Test]
-        public void T009_CleanupSyncDirectoryAndSyncAgain()
+        public void T012_CleanupSyncDirectoryAndSyncAgain()
         {
             var syncDirectory = Path.Combine(FileSystemUtils.GetDefaultAppDataFolderPath(), "Sync");
             FileSystemUtils.ScanDirectoryRecursively(syncDirectory, f => File.Delete(f)); // clean up
@@ -198,7 +217,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         }
 
         [Test]
-        public void T010_CheckSyncPopulateDatabase()
+        public void T013_CheckSyncPopulateDatabase()
         {
             // Make sure we have 4 files from prev. test
             var syncDirectory = Path.Combine(FileSystemUtils.GetDefaultAppDataFolderPath(), "Sync");
@@ -217,7 +236,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         }
 
         [Test]
-        public void T011_TryLoadPlugin()
+        public void T014_TryLoadPlugin()
         {
             var fn = BasicLogWritter.CurrentFileName;
 

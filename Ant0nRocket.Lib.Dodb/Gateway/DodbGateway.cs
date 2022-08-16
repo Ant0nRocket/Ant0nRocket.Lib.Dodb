@@ -4,6 +4,7 @@ using Ant0nRocket.Lib.Dodb.Dtos;
 using Ant0nRocket.Lib.Dodb.Entities;
 using Ant0nRocket.Lib.Dodb.Gateway.Helpers;
 using Ant0nRocket.Lib.Dodb.Gateway.Responses;
+using Ant0nRocket.Lib.Std20.Cryptography;
 using Ant0nRocket.Lib.Std20.Extensions;
 using Ant0nRocket.Lib.Std20.Logging;
 using Ant0nRocket.Lib.Std20.Reflection;
@@ -31,13 +32,13 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
          As you DbContext will be somewhere in external library we need to know how to get it.
          */
 
-        private static Func<IDodbContext> contextGetter;
+        private static Func<IDodbContext> dbContextGetterFunc;
 
-        public static void RegisterContextGetter(Func<IDodbContext> value) =>
-            contextGetter = value;
+        public static void RegisterDbContextGetterFunc(Func<IDodbContext> value) =>
+            dbContextGetterFunc = value;
 
-        public static IDodbContext GetContext() =>
-            contextGetter?.Invoke();
+        public static IDodbContext GetDbContext() =>
+            dbContextGetterFunc?.Invoke();
 
         #endregion
 
@@ -49,12 +50,12 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
         #endregion
 
-        private static GatewayResponse PushDtoObject<TPayload>(DtoOf<TPayload> dto, IDodbContext dbContext, Action<Document> onDocumentCreated = default) where TPayload : class, new()
+        private static GatewayResponse PushDtoObject<TPayload>(DtoOf<TPayload> dto, IDodbContext dbContext) where TPayload : class, new()
         {
             #region 1. Checking handlers and values
 
             if (dbContext == default) throw new ArgumentNullException(nameof(dbContext));
-            if (contextGetter == default) throw new NullReferenceException(nameof(contextGetter));
+            if (dbContextGetterFunc == default) throw new NullReferenceException(nameof(dbContextGetterFunc));
             if (dtoPayloadHandler == default) throw new NullReferenceException(nameof(dtoPayloadHandler));
 
             #endregion
@@ -92,7 +93,8 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             if (dto.DateCreatedUtc == DateTime.MinValue) // means that DTO created in app
             {                                            // because deserialized has some value
                 dto.RequiredDocumentId = dbContext
-                    .Documents.AsNoTracking()
+                    .Documents
+                    .AsNoTracking()
                     .OrderByDescending(d => d.DateCreatedUtc)
                     .FirstOrDefault()?.Id ?? Guid.Empty; // As we have a new DTO let's get latest document ID
                 dto.DateCreatedUtc = DateTime.UtcNow;
@@ -101,14 +103,13 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             var document = new Document
             {
                 Id = dto.Id,
-                // Don't touch AuthorId. We don't know it, and maybe will never know
+                UserId = dto.UserId,
                 RequiredDocumentId = dto.RequiredDocumentId,
                 DateCreatedUtc = dto.DateCreatedUtc,
                 PayloadType = $"{dto.Payload.GetType()}",
                 Payload = dto.Payload.AsJson()
             };
 
-            onDocumentCreated?.Invoke(document); // maybe someone out there will need to do something
             dbContext.Documents.Add(document);
 
             logger.LogInformation($"[uncommited] DTO '{dto.Id}' applied");
@@ -119,7 +120,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
         }
 
         /// <summary>
-        /// 1. Throws <see cref="NullReferenceException"/> if you forgot to register ContextGetter (see <see cref="RegisterContextGetter(Func{IDodbContext})"/>).<br /> 
+        /// 1. Throws <see cref="NullReferenceException"/> if you forgot to register ContextGetter (see <see cref="RegisterDbContextGetterFunc(Func{IDodbContext})"/>).<br /> 
         /// 2. Throws <see cref="NullReferenceException"/> if you forgot to register DtoHandler (see <see cref="RegisterDtoHandler(DtoPayloadHandler)"/>).<br />
         /// 3. Returnes <see cref="GrDtoIsInvalid"/> if there are some validation errors in DTO or its payload.<br />
         /// 4. Returnes <see cref="GrDocumentExists"/> if any document with <paramref name="dto"/>.Id already exists.<br />
@@ -136,16 +137,14 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
         /// </summary>
         public static GatewayResponse PushDto<TPayload>(
             DtoOf<TPayload> dto,
-            bool skipAuthTokenValidation = false,
-            Action<Document> onDocumentCreated = default,
             IDodbContext externalDbContext = default
         ) where TPayload : class, new()
         {
-            var validator = new DtoValidator<TPayload>(dto).Validate(skipAuthTokenValidation);
+            var validator = new DtoValidator<TPayload>(dto).Validate();
             if (validator.HasFoundErrors) return new GrDtoIsInvalid(validator.ErrorsList);
 
-            var dbContext = externalDbContext ?? GetContext();
-            var pushResult = PushDtoObject(dto, dbContext: dbContext, onDocumentCreated: onDocumentCreated);
+            var dbContext = externalDbContext ?? GetDbContext();
+            var pushResult = PushDtoObject(dto, dbContext);
 
             if (externalDbContext == default)
             {
@@ -167,5 +166,77 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
             return pushResult;
         }
+
+        #region Root user
+
+        private static Func<string, string> passwordHasherFunc;
+
+        public static void RegisterPasswordHasherFunc(Func<string, string> value) =>
+            passwordHasherFunc = value;
+
+        /// <summary>
+        /// Will calculate password hash.<br />
+        /// If password hasher registred (<see cref="RegisterPasswordHasherFunc(Func{string, string})"/>
+        /// then it will be used, othervise standard SHA-256 hash will be returned.
+        /// </summary>
+        public static string CalcPasswordHash(string password)
+        {
+            if (passwordHasherFunc != null)
+            {
+                return passwordHasherFunc(password);
+            }
+            else
+            {
+                return Hasher.CalculateHash(password);
+            }
+        }
+
+        public static User CreateRootUser(string password = "")
+        {
+            using var dbContext = GetDbContext();
+            if (dbContext.Users.Any(u => u.Name == "root"))
+            {
+                logger.LogError("root user already exists");
+                return null;
+            }
+
+            var user = new User
+            {
+                Name = "root",
+                PasswordHash = CalcPasswordHash(password),
+                IsAdmin = true,
+                IsHidden = true,
+            };
+
+            dbContext.Users.Add(user);
+            try
+            {
+                dbContext.SaveChanges();
+                logger.LogInformation("root user created");
+                return user;
+            }
+            catch (Exception ex)
+            {
+                logger.LogException(ex);
+                return null;
+            }
+        }
+
+        public static User AuthAsRoot(string password)
+        {
+            var passwordHash = CalcPasswordHash(password);
+            using var dbContext = GetDbContext();
+            var rootUser = dbContext
+                .Users
+                .Where(u => u.Name == "root" && u.IsAdmin && u.IsHidden && u.PasswordHash == passwordHash)
+                .SingleOrDefault();
+
+            if (rootUser == default)
+                logger.LogError("root user authorization failed");
+
+            return rootUser;
+        }
+
+        #endregion
     }
 }

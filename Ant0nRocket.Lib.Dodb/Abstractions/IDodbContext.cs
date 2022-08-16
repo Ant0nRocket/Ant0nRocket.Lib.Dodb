@@ -8,6 +8,8 @@ namespace Ant0nRocket.Lib.Dodb.Abstractions
     {
         DbSet<Document> Documents { get; set; }
 
+        DbSet<User> Users { get; set; }
+
         int SaveChanges();
     }
 }

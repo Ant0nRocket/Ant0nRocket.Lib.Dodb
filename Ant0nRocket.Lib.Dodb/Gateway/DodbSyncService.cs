@@ -120,7 +120,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
         /// </summary>
         private static HashSet<Guid> GetKnownDocumentIds(DateTime fromDate)
         {
-            using var dbContext = DodbGateway.GetContext();
+            using var dbContext = DodbGateway.GetDbContext();
             return dbContext
                 .Documents
                 .AsNoTracking()
@@ -189,7 +189,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
         /// </summary>
         private static void ExportDocuments(IEnumerable<Guid> documentIdsToExportList, string syncDocumentsDirectoryPath)
         {
-            using var dbContext = DodbGateway.GetContext();
+            using var dbContext = DodbGateway.GetDbContext();
 
             foreach (var documentId in documentIdsToExportList)
             {
@@ -244,16 +244,13 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                 var dto = new DtoOf<object>
                 {
                     Id = kvp.Key,
-                    AuthToken = document.AuthorId, // gateway will use AuthorId to store it in database
+                    UserId = document.UserId,
                     RequiredDocumentId = document.RequiredDocumentId,
                     DateCreatedUtc = document.DateCreatedUtc,
                     Payload = FileSystemUtils.GetSerializer().Deserialize(document.Payload, payloadType),
                 };
 
-                var pushResult = DodbGateway.PushDto(
-                    dto: dto,
-                    skipAuthTokenValidation: true,
-                    onDocumentCreated: d => d.AuthorId = dto.AuthToken);
+                var pushResult = DodbGateway.PushDto(dto);
 
                 var isPushResultSuccessful = AttributeUtils
                     .GetAttribute<IsSuccessAttribute>(pushResult.GetType())?.IsSuccess ??

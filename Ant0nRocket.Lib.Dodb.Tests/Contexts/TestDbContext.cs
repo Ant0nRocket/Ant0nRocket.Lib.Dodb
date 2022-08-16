@@ -10,6 +10,8 @@ namespace Ant0nRocket.Lib.Dodb.Tests.Contexts
     {
         public DbSet<Document> Documents { get; set; }
 
+        public DbSet<User> Users { get; set; }
+
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
             var fileName = FileSystemUtils.GetDefaultAppDataFolderPathFor("TestDb.sqlite");

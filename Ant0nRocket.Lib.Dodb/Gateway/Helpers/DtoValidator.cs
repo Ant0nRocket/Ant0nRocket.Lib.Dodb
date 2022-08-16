@@ -16,7 +16,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway.Helpers
             this.dto = dto;
         }
 
-        public DtoValidator<T> Validate(bool skipAuthTokenValidation = false)
+        public DtoValidator<T> Validate()
         {
             ErrorsList ??= new();
             ErrorsList.Clear();
@@ -24,9 +24,6 @@ namespace Ant0nRocket.Lib.Dodb.Gateway.Helpers
             // Check basic properties
             if (dto.Id == Guid.Empty) 
                 ErrorsList.Add($"{nameof(dto.Id)} is not set");
-
-            if (!skipAuthTokenValidation && dto.AuthToken == default)
-                ErrorsList.Add($"{nameof(dto.AuthToken)} is not set");
 
             // Check payload using annotations
             var validationContext = new ValidationContext(dto.Payload);

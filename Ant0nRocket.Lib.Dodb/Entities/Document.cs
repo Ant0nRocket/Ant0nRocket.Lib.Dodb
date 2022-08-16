@@ -2,7 +2,9 @@
 {
     public class Document : EntityBase
     {
-        public Guid AuthorId { get; set; }
+        public Guid UserId { get; set; }
+
+        public User User { get; set; }
 
         public Guid RequiredDocumentId { get; set; }
 

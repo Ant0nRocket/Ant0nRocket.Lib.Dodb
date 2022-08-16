@@ -8,10 +8,9 @@
         public Guid Id { get; set; } = Guid.NewGuid();
 
         /// <summary>
-        /// Authorization token. If you don't want the gateway
-        /// check this field Push with <i>skipAuthTokenValidation</i> set to true.
+        /// Id of a <see cref="Entities.User"/> that created this DTO
         /// </summary>
-        public Guid AuthToken { get; set; } = Guid.Empty;
+        public Guid UserId { get; set; } = Guid.Empty;
 
         /// <summary>
         /// Requires specified document to exists in database.
