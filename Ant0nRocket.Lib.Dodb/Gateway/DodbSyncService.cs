@@ -282,13 +282,13 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             {
                 var pluginInstance = (IDodbSyncServicePlugin)Activator.CreateInstance(pluginType);
                 logger.LogInformation($"Found plugin '{pluginInstance.Name}'. Ready state: {pluginInstance.IsReady}.");
-                logger.LogInformation($"Starting Sync method of plugin '{pluginInstance.Name}'");
 
                 try
                 {
-                    OnSyncPluginBeforeLaunch?.Invoke(null, pluginInstance);
                     if (pluginInstance.IsReady)
                     {
+                        OnSyncPluginBeforeLaunch?.Invoke(null, pluginInstance);
+                        logger.LogInformation($"Starting Sync method of plugin '{pluginInstance.Name}'");
                         pluginInstance.Sync();
                     }
                     else
@@ -298,7 +298,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                     OnSyncPluginWorkComplete?.Invoke(null, pluginInstance);
                 }
                 catch (Exception ex)
-                {                    
+                {
                     logger.LogException(ex);
                     OnSyncPluginError?.Invoke(null, new SyncPluginErrorEventArgs { Plugin = pluginInstance, Exception = ex });
                 }
