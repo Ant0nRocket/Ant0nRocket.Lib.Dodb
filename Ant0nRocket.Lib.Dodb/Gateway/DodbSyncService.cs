@@ -124,7 +124,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             return dbContext
                 .Documents
                 .AsNoTracking()
-                .Where(d => d.DateCreatedUtc > fromDate && d.IsDeleted == false)
+                .Where(d => d.DateCreatedUtc > fromDate)
                 .OrderBy(d => d.DateCreatedUtc)
                 .Select(d => d.Id)
                 .ToHashSet();
