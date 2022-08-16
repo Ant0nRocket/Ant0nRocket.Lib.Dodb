@@ -16,51 +16,69 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
     {
         private static readonly Logger logger = Logger.Create(nameof(DodbSyncService));
 
-        public static event Action OnSyncStarted;
-        public static event Action<(long current, long total)> OnSyncProgress;
-        public static event Action OnSyncCompleted;
-        public static event Action<string> OnSyncError;
+        #region Sync documents
 
-        private static string syncDirectoryPath = default;
+        public static event EventHandler<string> OnSyncDocumentsStarted;
+        public static event EventHandler<DateTime> OnSyncDocumentsArchiveFound;
+        public static event EventHandler<string> OnSyncDocumentsCompleted;
+        public static event EventHandler<string> OnSyncError;
 
-        public static void SetSyncDirectoryPath(string value) => syncDirectoryPath = value;
-
-        public static void Sync()
+        /// <summary>
+        /// Performes syncthronization of known Documents inside <paramref name="syncDocumentsDirectoryPath"/>.<br />
+        /// </summary>
+        public static void SyncDocuments(string syncDocumentsDirectoryPath)
         {
-            if (syncDirectoryPath == default)
+            if (syncDocumentsDirectoryPath == default)
             {
                 const string ERROR_MESSAGE = "SyncDirectoryPath is not set";
-                OnSyncError?.Invoke(ERROR_MESSAGE);
+                OnSyncError?.Invoke(null, ERROR_MESSAGE);
                 logger.LogError(ERROR_MESSAGE);
             }
             else
             {
-                FileSystemUtils.TouchDirectory(syncDirectoryPath); // just to sure
-                OnSyncStarted?.Invoke();
-                PerformSyncIteration();
-                OnSyncCompleted?.Invoke();
+                FileSystemUtils.TouchDirectory(syncDocumentsDirectoryPath); // just to sure
+                OnSyncDocumentsStarted?.Invoke(null, syncDocumentsDirectoryPath);
+                PerformSyncDocumentsIteration(syncDocumentsDirectoryPath);
+                OnSyncDocumentsCompleted?.Invoke(null, syncDocumentsDirectoryPath);
             }
         }
 
-        private static void PerformSyncIteration()
+        private static void PerformSyncDocumentsIteration(string syncDocumentsDirectoryPath)
         {
-            var workingDate = ScanSyncDirectoryAndFindMinimumExportDate();
-            var knownDocumentIdHashSet = GetKnownDocumentIdHashSet(workingDate);
-            var syncDirectoryDocumentsIdAndPath = GetSyncDirectoryDocumentsIdAndPath();
-            var documentsToExportList = GetDocumentsToExportList(knownDocumentIdHashSet, syncDirectoryDocumentsIdAndPath);
-            var documentsToImportDict = GetDocumentsToImportDict(knownDocumentIdHashSet, syncDirectoryDocumentsIdAndPath);
-            ExportDocuments(documentsToExportList);
-            ImportDocuments(documentsToImportDict);
+            var exportFromDate = ScanSyncDocumentsDirectoryMinExportDate(syncDocumentsDirectoryPath);
+            var knownDocumentIds = GetKnownDocumentIds(exportFromDate);
+            var exportedDocumentsIdAndPathDict = GetExportedDocumentsIdAndPathDict(syncDocumentsDirectoryPath);
+
+            var documentIdsToExportList = GetDocumentIdsToExportList(knownDocumentIds, exportedDocumentsIdAndPathDict);
+
+            var documentIdAndPathToImportDict = GetDocumentIdAndPathToImportDict(
+                knownDocumentIds, 
+                exportedDocumentsIdAndPathDict);
+
+            ExportDocuments(documentIdsToExportList, syncDocumentsDirectoryPath);
+            ImportDocuments(documentIdAndPathToImportDict);
         }
 
-        private static DateTime ScanSyncDirectoryAndFindMinimumExportDate()
+        /// <summary>
+        /// Sync directory could contain archives (zip or 7z) in format 'yyyyMMdd.(zip|7z)'.<br />
+        /// This function will find them all and return latest covered date.<br />
+        /// <b>NB! Function will not open that archive! It's a user duty to pack archives with care!</b>
+        /// <br /><br />
+        /// Assume, that we have folder structure like this:<br />
+        /// - 20220719.zip<br />
+        /// - 20220829.7z<br />
+        /// - ... (documents)<br /><br />
+        /// Library will decide that all documents from the begining of time till 29th Aug 2022 are
+        /// packed inside archives and will skip documents with less DateCreatedUtc then found date.
+        /// </summary>
+        private static DateTime ScanSyncDocumentsDirectoryMinExportDate(string syncDocumentsDirectoryPath)
         {
             const string FILENAME_PATTERN =
-                @"(?<YearFrom>\d{4})(?<MonthFrom>\d{2})(?<DayFrom>\d{2})_(?<YearTo>\d{4})(?<MonthTo>\d{2})(?<DayTo>\d{2})\.(zip|7z)";
+                @"(?<YearTo>\d{4})(?<MonthTo>\d{2})(?<DayTo>\d{2})\.(zip|7z)";
 
-            var result = DateTime.MinValue;
+            DateTime latestFoundArchiveDate = DateTime.MinValue;
 
-            FileSystemUtils.ScanDirectoryRecursively(syncDirectoryPath, f =>
+            FileSystemUtils.ScanDirectoryRecursively(syncDocumentsDirectoryPath, f =>
             {
                 var match = Regex.Match(f, FILENAME_PATTERN);
                 if (match.Success)
@@ -78,22 +96,27 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                         millisecond: 999,
                         DateTimeKind.Utc
                         );
-                    if (tempDate > result) result = tempDate;
-
+                    if (tempDate > latestFoundArchiveDate)
+                    {
+                        latestFoundArchiveDate = tempDate;
+                        OnSyncDocumentsArchiveFound?.Invoke(null, latestFoundArchiveDate);
 #if DEBUG
-                    logger.LogDebug($"Archive till '{tempDate}' found.");
+                        logger.LogDebug($"Archive till '{tempDate}' found.");
 #endif
+                    }
+
                 }
             });
 
-            return result;
+            return latestFoundArchiveDate;
         }
 
-
         /// <summary>
-        /// Returnes a HashSet of Id of known documents (existing in database)
+        /// Returnes a HashSet of Id of Documents which are known from <paramref name="fromDate"/>.<br />
+        /// <paramref name="fromDate"/> could be calculated by function 
+        /// <see cref="ScanSyncDocumentsDirectoryMinExportDate"/>.
         /// </summary>
-        private static HashSet<Guid> GetKnownDocumentIdHashSet(DateTime fromDate)
+        private static HashSet<Guid> GetKnownDocumentIds(DateTime fromDate)
         {
             using var dbContext = DodbGateway.GetContext();
             return dbContext
@@ -106,10 +129,10 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
         }
 
         /// <summary>
-        /// Scans a syncDirectoryPath and returnes a Dictionary
-        /// where key is a DocumentId (Guid) and value is a full path to file.
+        /// Scans a <paramref name="syncDocumentsDirectoryPath"/> and returnes a dictionary
+        /// where key is a Document.Id (Guid) and value is a full path to file.
         /// </summary>
-        private static Dictionary<Guid, string> GetSyncDirectoryDocumentsIdAndPath()
+        private static Dictionary<Guid, string> GetExportedDocumentsIdAndPathDict(string syncDocumentsDirectoryPath)
         {
             const string FILENAME_PATTERN =
                 @"(?<Year>\d{4})(?<Month>\d{2})(?<Day>\d{2})_" +
@@ -117,8 +140,8 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                 @"(?<DocumentId>[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})";
 
             var foundDocumentsIdAndPath = new Dictionary<Guid, string>();
-            
-            FileSystemUtils.ScanDirectoryRecursively(syncDirectoryPath, f =>
+
+            FileSystemUtils.ScanDirectoryRecursively(syncDocumentsDirectoryPath, f =>
             {
                 var match = Regex.Match(f, FILENAME_PATTERN);
                 if (match.Success)
@@ -132,27 +155,41 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
         }
 
         /// <summary>
-        /// Returnes a list of documents (Id) which are need to be exported
+        /// Returnes a list of Document IDs which are need to be exported.<br />
+        /// <paramref name="knownDocumentIds"/> - from <see cref="GetKnownDocumentIds(DateTime)"/><br />
+        /// <paramref name="exportedDocumentsIdAndPathDict"/> - from <see cref="GetExportedDocumentsIdAndPathDict(string)"/>
         /// </summary>
-        private static IEnumerable<Guid> GetDocumentsToExportList(HashSet<Guid> knownDocumentIdHashSet, Dictionary<Guid, string> syncDirectoryDocumentsIdAndPath) =>
-            knownDocumentIdHashSet.Where(id => !syncDirectoryDocumentsIdAndPath.ContainsKey(id)).ToList();
+        private static IEnumerable<Guid> GetDocumentIdsToExportList(
+            HashSet<Guid> knownDocumentIds,
+            Dictionary<Guid, string> exportedDocumentsIdAndPathDict)
+        {
+            return knownDocumentIds
+                .Where(id => !exportedDocumentsIdAndPathDict.ContainsKey(id))
+                .ToList();
+        }
 
         /// <summary>
-        /// Returnes a dictionary (Id, Path) of documents which are need to be imported
+        /// Returnes a dictionary (Id, Path) of documents which are need to be imported.
+        /// <paramref name="knownDocumentIds"/> - from <see cref="GetKnownDocumentIds(DateTime)"/><br />
         /// </summary>
-        private static IDictionary<Guid, string> GetDocumentsToImportDict(HashSet<Guid> knownDocumentIdHashSet, Dictionary<Guid, string> syncDirectoryDocumentsIdAndPath) =>
-            syncDirectoryDocumentsIdAndPath
-                .Where(kvp => !knownDocumentIdHashSet.Contains(kvp.Key))
+        private static IDictionary<Guid, string> GetDocumentIdAndPathToImportDict(
+            HashSet<Guid> knownDocumentIds,
+            Dictionary<Guid, string> exportedDocumentsIdAndPathDict)
+        {
+            return exportedDocumentsIdAndPathDict
+                .Where(kvp => !knownDocumentIds.Contains(kvp.Key))
                 .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+        }
 
         /// <summary>
-        /// Exports specified documents to syncDirectoryPath
+        /// Retreives documents from <paramref name="documentIdsToExportList"/> and exports them
+        /// into directory <paramref name="syncDocumentsDirectoryPath"/>.
         /// </summary>
-        private static void ExportDocuments(IEnumerable<Guid> documentsToExportList)
+        private static void ExportDocuments(IEnumerable<Guid> documentIdsToExportList, string syncDocumentsDirectoryPath)
         {
             using var dbContext = DodbGateway.GetContext();
 
-            foreach (var documentId in documentsToExportList)
+            foreach (var documentId in documentIdsToExportList)
             {
                 var document = dbContext
                     .Documents
@@ -162,18 +199,18 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
                 var documentJsonValue = document.AsJson();
 
-                var syncDirectoryWithSubFolderPath = Path.Combine(
-                    syncDirectoryPath,
+                var syncDocumentsDirectoryWithSubFolderPath = Path.Combine(
+                    syncDocumentsDirectoryPath,
                     document.DateCreatedUtc.ToString("yyyyMMdd"));
 
-                if (!FileSystemUtils.TouchDirectory(syncDirectoryWithSubFolderPath))
+                if (!FileSystemUtils.TouchDirectory(syncDocumentsDirectoryWithSubFolderPath))
                 {
-                    logger.LogError($"Can't create directory '{syncDirectoryWithSubFolderPath}'. Sync operation stopped");
+                    logger.LogError($"Can't create directory '{syncDocumentsDirectoryWithSubFolderPath}'. Sync operation stopped");
                     return;
                 }
 
                 var shortFileName = $"{document.DateCreatedUtc:yyyyMMdd}_{document.DateCreatedUtc:HHmmssfffffff}_{document.Id}.json";
-                var resultPath = Path.Combine(syncDirectoryWithSubFolderPath, shortFileName);
+                var resultPath = Path.Combine(syncDocumentsDirectoryWithSubFolderPath, shortFileName);
 
                 File.WriteAllText(resultPath, documentJsonValue);
 
@@ -181,9 +218,12 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             }
         }
 
-        private static void ImportDocuments(IDictionary<Guid, string> documentsToImportDict)
+        /// <summary>
+        /// Peformes import of documents specified in <paramref name="documentIdAndPathToImportDict"/>.
+        /// </summary>
+        private static void ImportDocuments(IDictionary<Guid, string> documentIdAndPathToImportDict)
         {
-            foreach (var kvp in documentsToImportDict)
+            foreach (var kvp in documentIdAndPathToImportDict)
             {
                 var document = FileSystemUtils.TryReadFromFile<Document>(kvp.Value);
                 if (document.Id != kvp.Key)
@@ -192,7 +232,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                     continue;
                 }
 
-                var payloadType = GetTypeAccrossAppDomain(document.PayloadType);
+                var payloadType = AttributeUtils.FindTypeAccrossAppDomain(document.PayloadType);
                 if (payloadType == null)
                 {
                     logger.LogError($"Type '{document.PayloadType}' from '{document.Id}' doesn't exists in current app domain");
@@ -209,12 +249,12 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                 };
 
                 var pushResult = DodbGateway.PushDto(
-                    dto: dto, 
+                    dto: dto,
                     skipAuthTokenValidation: true,
                     onDocumentCreated: d => d.AuthorId = dto.AuthToken);
 
                 var isPushResultSuccessful = AttributeUtils
-                    .GetAttribute<IsSuccessAttribute>(pushResult.GetType())?.IsSuccess ?? 
+                    .GetAttribute<IsSuccessAttribute>(pushResult.GetType())?.IsSuccess ??
                     true; // by default operation mean to be successful (non-successful are marked in attribute)
 
                 if (isPushResultSuccessful)
@@ -225,18 +265,15 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             }
         }
 
-        private static Type GetTypeAccrossAppDomain(string typeName)
-        {
-            var assemblies = AppDomain.CurrentDomain.GetAssemblies();
-            foreach (var assembly in assemblies)
-            {
-                var types = assembly.GetTypes();
-                var targetType = types.Where(t => t.FullName == typeName).FirstOrDefault();
-                if (targetType != null)
-                    return targetType;
-            }
+        #endregion
 
-            return null;
+        #region Sync plugins
+
+        public static void SyncPlugins()
+        {
+            
         }
+
+        #endregion
     }
 }

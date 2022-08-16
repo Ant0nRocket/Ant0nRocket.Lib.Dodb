@@ -6,7 +6,7 @@
     <Nullable>disable</Nullable>
     <PackageProjectUrl>https://github.com/Ant0nRocket/Ant0nRocket.Lib.Dodb</PackageProjectUrl>
     <Copyright>Ant0nRocket</Copyright>
-    <Version>1.1.15</Version>
+    <Version>1.1.16</Version>
     <PackageLicenseExpression>AFL-3.0</PackageLicenseExpression>
   </PropertyGroup>
 
@@ -20,5 +20,9 @@
     <PackageReference Include="Ant0nRocket.Lib.Std20" Version="1.6.8" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="6.0.8" />
   </ItemGroup>
+
+  <Target Name="PostPackNugetDeploy" AfterTargets="Pack" Condition="'$(Configuration)' == 'Release'">
+    <Exec Command="nuget.exe add &quot;$(ProjectDir)$(OutputPath)../$(PackageId).$(PackageVersion).nupkg&quot; -source ../../.nuget_local_repo" />
+  </Target>
 
 </Project>

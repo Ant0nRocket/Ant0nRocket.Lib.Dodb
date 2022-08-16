@@ -189,9 +189,8 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         public void T998_Sync()
         {
             var syncDirectory = Path.Combine(FileSystemUtils.GetDefaultAppDataFolderPath(), "Sync");
-            DodbSyncService.SetSyncDirectoryPath(syncDirectory);
             FileSystemUtils.ScanDirectoryRecursively(syncDirectory, f => File.Delete(f)); // clean up
-            DodbSyncService.Sync(); // should create 4 files
+            DodbSyncService.SyncDocuments(syncDirectory); // should create 4 files
 
             var filesList = new List<string>();
             FileSystemUtils.ScanDirectoryRecursively(syncDirectory, f => filesList.Add(f));
@@ -212,7 +211,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
             dbContext.SaveChanges();
             Assert.AreEqual(false, dbContext.Documents.Any());
 
-            DodbSyncService.Sync();
+            DodbSyncService.SyncDocuments(syncDirectory);
 
             Assert.AreEqual(4, dbContext.Documents.Count());
         }
