@@ -222,19 +222,19 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             }
         }
 
-        public static User AuthAsRoot(string password)
+        public static User AuthUser(string userName, string password)
         {
             var passwordHash = CalcPasswordHash(password);
             using var dbContext = GetDbContext();
-            var rootUser = dbContext
+            var user = dbContext
                 .Users
-                .Where(u => u.Name == "root" && u.IsAdmin && u.IsHidden && u.PasswordHash == passwordHash)
+                .Where(u => u.Name == userName && u.PasswordHash == passwordHash)
                 .SingleOrDefault();
 
-            if (rootUser == default)
-                logger.LogError("root user authorization failed");
+            if (user == default)
+                logger.LogError($"User '{userName}' authorization failed");
 
-            return rootUser;
+            return user;
         }
 
         #endregion

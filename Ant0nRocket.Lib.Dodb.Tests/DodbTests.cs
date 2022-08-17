@@ -27,7 +27,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         public void T001_RegisterGetterAndHandlers()
         {
             Ant0nRocketLibConfig.IsPortableMode = true;
-            BasicLogWritter.LogFileNamePrefix = "EkChuaj.Tests_";
+            BasicLogWritter.LogFileNamePrefix = "DodbGateway.Tests_";
             Logger.LogToBasicLogWritter = true;
 
             DodbGateway.RegisterDbContextGetterFunc(new Func<IDodbContext>(() => new TestDbContext()));
@@ -59,9 +59,9 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         public void T003_AuthAsRoot()
         {
             Assert.That(rootUser is null); // should be null from prev. test
-            rootUser = DodbGateway.AuthAsRoot("root2"); // wrong password
+            rootUser = DodbGateway.AuthUser("root", "root2"); // wrong password
             Assert.That(rootUser is null);
-            rootUser = DodbGateway.AuthAsRoot("root"); // correct
+            rootUser = DodbGateway.AuthUser("root", "root"); // correct
             Assert.That(rootUser is not null);
         }
 
