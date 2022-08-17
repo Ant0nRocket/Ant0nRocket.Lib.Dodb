@@ -4,7 +4,6 @@ using Ant0nRocket.Lib.Dodb.Dtos;
 using Ant0nRocket.Lib.Dodb.Entities;
 using Ant0nRocket.Lib.Dodb.Gateway.Helpers;
 using Ant0nRocket.Lib.Dodb.Gateway.Responses;
-using Ant0nRocket.Lib.Std20.Cryptography;
 using Ant0nRocket.Lib.Std20.Extensions;
 using Ant0nRocket.Lib.Std20.Logging;
 using Ant0nRocket.Lib.Std20.Reflection;
@@ -18,11 +17,13 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
     /// </summary>
     public static class DodbGateway
     {
-        #region Init
-
         private static readonly Logger logger = Logger.Create(nameof(DodbGateway));
 
-        #endregion
+        #region DTO handling
+
+        private static bool? _isAnyDocumentExist = null;
+
+        public static bool IsAnyDocumentExist => _isAnyDocumentExist == true ? true : false;
 
         #region DbContext getter
 
@@ -58,20 +59,66 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             if (dbContextGetterFunc == default) throw new NullReferenceException(nameof(dbContextGetterFunc));
             if (dtoPayloadHandler == default) throw new NullReferenceException(nameof(dtoPayloadHandler));
 
+            if (_isAnyDocumentExist == null)
+            {
+                _isAnyDocumentExist = CheckDocumentExist(dbContext);
+                logger.LogDebug($"Any documents found? - {_isAnyDocumentExist}");
+            }
+
             #endregion
 
             #region 2. Check document doesn't exists, check required document exists
 
-            if (dbContext.Documents.Any(d => d.Id == dto.Id))
-                return new GrDocumentExists { DocumentId = dto.Id };
+            // Check user exists (if it's not first document!)
+            if (!CheckUserExists(dbContext, dto.UserId)) // such user not found
+            {
+                if (_isAnyDocumentExist == true) // ...but some documents already exists
+                {
+                    logger.LogError($"DTO from unknown user '{dto.UserId}' received");
+                    return new GrDtoFromUnknownUser { UserId = dto.UserId };
+                }
+            }
 
-            if (dto.RequiredDocumentId != default) // some document ID required
-                if (!dbContext.Documents.AsNoTracking().Any(d => d.Id == dto.RequiredDocumentId))
+            // Check document with dto.Id doesn't exist
+            if (CheckDocumentExist(dbContext, dto.Id))
+            {
+                logger.LogError($"Document with Id='{dto.Id}' already exists");
+                return new GrDocumentExists { DocumentId = dto.Id };
+            }
+
+            if (dto.RequiredDocumentId == default)
+            {
+                if (dto.DateCreatedUtc == DateTime.MinValue) // that means in app generated
+                {
+                    dto.DateCreatedUtc = DateTime.UtcNow;
+                    dto.RequiredDocumentId = GetLatestDocumentId(dbContext);
+                }
+                else
+                {
+                    var message = $"Invalid DTO '{dto.Id}' with no date and no requied document ID received";
+                    logger.LogError(message);
+                    return new GrDtoIsInvalid(message);
+                }
+            }
+            else // if (dto.RequiredDocumentId == default) || some required document specified in DTO
+            {
+                if (dto.DateCreatedUtc == DateTime.MinValue)
+                {
+                    var message = $"Invalid DTO '{dto.Id}' with no date but with required document ID received";
+                    logger.LogError(message);
+                    return new GrDtoIsInvalid(message);
+                }
+
+                if (!CheckDocumentExist(dbContext, dto.RequiredDocumentId))
+                {
+                    logger.LogWarning($"DTO '{dto.Id}' requires Document '{dto.RequiredDocumentId}' which is not found");
                     return new GrRequiredDocumentNotFound
-                    { // if required document is not found - end. Maybe next time it will be there.
+                    {
                         RequesterId = dto.Id,
-                        RequiredDocumentId = dto.RequiredDocumentId
+                        RequiredDocumentId = dto.RequiredDocumentId,
                     };
+                }
+            }
 
             #endregion
 
@@ -89,23 +136,13 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                 return dtoHandleResponse;
             }
 
-
-            if (dto.DateCreatedUtc == DateTime.MinValue) // means that DTO created in app
-            {                                            // because deserialized has some value
-                dto.RequiredDocumentId = dbContext
-                    .Documents
-                    .AsNoTracking()
-                    .OrderByDescending(d => d.DateCreatedUtc)
-                    .FirstOrDefault()?.Id ?? Guid.Empty; // As we have a new DTO let's get latest document ID
-                dto.DateCreatedUtc = DateTime.UtcNow;
-            }
-
             var document = new Document
             {
                 Id = dto.Id,
                 UserId = dto.UserId,
                 RequiredDocumentId = dto.RequiredDocumentId,
                 DateCreatedUtc = dto.DateCreatedUtc,
+                Description = dto.Description,
                 PayloadType = $"{dto.Payload.GetType()}",
                 Payload = dto.Payload.AsJson()
             };
@@ -117,6 +154,40 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             #endregion
 
             return dtoHandleResponse;
+        }
+
+        /// <summary>
+        /// Checks specified by <paramref name="userId"/> user exists.
+        /// </summary>
+        private static bool CheckUserExists(IDodbContext dbContext, Guid userId = default)
+        {
+            return dbContext.Users.AsNoTracking().Any(u => u.Id == userId);
+        }
+
+        /// <summary>
+        /// Checks any document (default <paramref name="documentId"/>) or
+        /// specified by <paramref name="documentId"/> exists.
+        /// </summary>
+        private static bool CheckDocumentExist(IDodbContext dbContext, Guid documentId = default)
+        {
+            var query = dbContext.Documents.AsNoTracking();
+
+            if (documentId != default)
+                query = query.Where(d => d.Id == documentId);
+
+            return query.Any();
+        }
+
+        /// <summary>
+        /// Gets the latest document Id or empty Guid if no documents found.
+        /// </summary>
+        private static Guid GetLatestDocumentId(IDodbContext dbContext)
+        {
+            return dbContext
+                    .Documents
+                    .AsNoTracking()
+                    .OrderByDescending(d => d.DateCreatedUtc)
+                    .FirstOrDefault()?.Id ?? Guid.Empty;
         }
 
         /// <summary>
@@ -141,7 +212,11 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
         ) where TPayload : class, new()
         {
             var validator = new DtoValidator<TPayload>(dto).Validate();
-            if (validator.HasFoundErrors) return new GrDtoIsInvalid(validator.ErrorsList);
+            if (validator.HasFoundErrors)
+            {
+                logger.LogError($"Invalid DTO '{dto.Id}': {string.Join(", ", validator.ErrorsList)}");
+                return new GrDtoIsInvalid(validator.ErrorsList);
+            }
 
             var dbContext = externalDbContext ?? GetDbContext();
             var pushResult = PushDtoObject(dto, dbContext);
@@ -167,75 +242,11 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             return pushResult;
         }
 
-        #region Root user
+        #endregion
 
-        private static Func<string, string> passwordHasherFunc;
+        #region Users managing
 
-        public static void RegisterPasswordHasherFunc(Func<string, string> value) =>
-            passwordHasherFunc = value;
 
-        /// <summary>
-        /// Will calculate password hash.<br />
-        /// If password hasher registred (<see cref="RegisterPasswordHasherFunc(Func{string, string})"/>
-        /// then it will be used, othervise standard SHA-256 hash will be returned.
-        /// </summary>
-        public static string CalcPasswordHash(string password)
-        {
-            if (passwordHasherFunc != null)
-            {
-                return passwordHasherFunc(password);
-            }
-            else
-            {
-                return Hasher.CalculateHash(password);
-            }
-        }
-
-        public static User CreateRootUser(string password = "")
-        {
-            using var dbContext = GetDbContext();
-            if (dbContext.Users.Any(u => u.Name == "root"))
-            {
-                logger.LogError("root user already exists");
-                return null;
-            }
-
-            var user = new User
-            {
-                Name = "root",
-                PasswordHash = CalcPasswordHash(password),
-                IsAdmin = true,
-                IsHidden = true,
-            };
-
-            dbContext.Users.Add(user);
-            try
-            {
-                dbContext.SaveChanges();
-                logger.LogInformation("root user created");
-                return user;
-            }
-            catch (Exception ex)
-            {
-                logger.LogException(ex);
-                return null;
-            }
-        }
-
-        public static User AuthUser(string userName, string password)
-        {
-            var passwordHash = CalcPasswordHash(password);
-            using var dbContext = GetDbContext();
-            var user = dbContext
-                .Users
-                .Where(u => u.Name == userName && u.PasswordHash == passwordHash)
-                .SingleOrDefault();
-
-            if (user == default)
-                logger.LogError($"User '{userName}' authorization failed");
-
-            return user;
-        }
 
         #endregion
     }

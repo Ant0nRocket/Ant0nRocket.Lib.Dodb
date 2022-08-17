@@ -18,6 +18,11 @@
         public Guid RequiredDocumentId { get; set; } = Guid.Empty;
 
         /// <summary>
+        /// Comment of document.
+        /// </summary>
+        public string Description { get; set; } = default;
+
+        /// <summary>
         /// Date when the document was created.<br />
         /// Library will assign it automatically.
         /// </summary>

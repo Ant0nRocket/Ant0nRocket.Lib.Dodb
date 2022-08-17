@@ -14,7 +14,8 @@ namespace Ant0nRocket.Lib.Dodb.Tests.Contexts
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
-            var fileName = FileSystemUtils.GetDefaultAppDataFolderPathFor("TestDb.sqlite");
+            var fileName = FileSystemUtils
+                .GetDefaultAppDataFolderPathFor("TestDb.sqlite", subDirectory: "Data", autoTouchDirectory: true);
             optionsBuilder.UseSqlite($"Filename='{fileName}'");
         }
 
