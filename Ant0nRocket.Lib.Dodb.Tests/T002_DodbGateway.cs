@@ -1,4 +1,8 @@
-﻿using Ant0nRocket.Lib.Dodb.Abstractions;
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+
 using Ant0nRocket.Lib.Dodb.Dtos;
 using Ant0nRocket.Lib.Dodb.Entities;
 using Ant0nRocket.Lib.Dodb.Gateway;
@@ -6,67 +10,26 @@ using Ant0nRocket.Lib.Dodb.Gateway.Responses;
 using Ant0nRocket.Lib.Dodb.Tests.Contexts;
 using Ant0nRocket.Lib.Dodb.Tests.Dto.Payloads;
 using Ant0nRocket.Lib.Dodb.Tests.Entities;
-using Ant0nRocket.Lib.Dodb.Tests.Services;
-using Ant0nRocket.Lib.Std20;
 using Ant0nRocket.Lib.Std20.IO;
 using Ant0nRocket.Lib.Std20.Logging;
 
 using NUnit.Framework;
 
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-
 namespace Ant0nRocket.Lib.Dodb.Tests
 {
-
-    public class DodbTests
+    public class T002_DodbGateway
     {
-        [Test]
-        public void T001_RegisterGetterAndHandlers()
-        {
-            Ant0nRocketLibConfig.IsPortableMode = true;
-            BasicLogWritter.LogFileNamePrefix = "DodbGateway.Tests_";
-            Logger.LogToBasicLogWritter = true;
-
-            DodbGateway.RegisterDbContextGetterFunc(new Func<IDodbContext>(() => new TestDbContext()));
-            DodbGateway.RegisterDtoHandler(DtoHandlerMethod);
-        }
-
-        private GatewayResponse DtoHandlerMethod(object dtoPayloadObject, IDodbContext dbContext)
-        {
-            return dtoPayloadObject switch
-            {
-                TestPayload dtoPayload => TestService.TestMethod(dtoPayload, dbContext),
-                AnnotatedPayload => new GrOk(),
-                ListPayload => new GrOk(),
-                _ => new GrDtoPayloadHandlerNotFound()
-            };
-        }
-
-        private User rootUser;
+        private static User? rootUser;
 
         [Test]
-        public void T002_CreatingRootUser()
+        public void T000_AuthAsRoot()
         {
-            rootUser = DodbGateway.CreateRootUser("root");
-            Assert.That(rootUser is not null);
-            rootUser = null;
-        }
-
-        [Test]
-        public void T003_AuthAsRoot()
-        {
-            Assert.That(rootUser is null); // should be null from prev. test
-            rootUser = DodbGateway.AuthUser("root", "root2"); // wrong password
-            Assert.That(rootUser is null);
-            rootUser = DodbGateway.AuthUser("root", "root"); // correct
+            T001_DodbUsersServiceTests.AuthUser("root", "root", out rootUser);
             Assert.That(rootUser is not null);
         }
 
         [Test]
-        public void T004_SendingUnHandledDtoType()
+        public void T001_SendingUnHandledDtoType()
         {
             var dto = new DtoOf<NotHandledPayload>() { Id = Guid.NewGuid(), UserId = Guid.NewGuid() };
             var result = DodbGateway.PushDto(dto);
@@ -75,7 +38,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         }
 
         [Test]
-        public void T005_SendingDtoWithInvalidDtoProperties()
+        public void T002_SendingDtoWithInvalidDtoProperties()
         {
             var dto = new DtoOf<TestPayload>() { Id = Guid.Empty };
             var result = DodbGateway.PushDto(dto);
@@ -84,7 +47,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         }
 
         [Test]
-        public void T006_1_SendingDtoWithAnnotationValidationErrors()
+        public void T003_1_SendingDtoWithAnnotationValidationErrors()
         {
             var dto = new DtoOf<AnnotatedPayload>
             {
@@ -105,7 +68,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         }
 
         [Test]
-        public void T007_2_SendingDtoWithIValidatableImplementation()
+        public void T003_2_SendingDtoWithIValidatableImplementation()
         {
             var dto = new DtoOf<ValidatablePayload>
             {
@@ -122,7 +85,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         }
 
         [Test]
-        public void T008_SendValidDto()
+        public void T004_SendValidDto()
         {
             var dto = new DtoOf<AnnotatedPayload>()
             {
@@ -141,7 +104,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         }
 
         [Test]
-        public void T009_SendAnotherValidDto()
+        public void T005_SendAnotherValidDto()
         {
             var dto = new DtoOf<AnnotatedPayload>()
             {
@@ -160,7 +123,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         }
 
         [Test]
-        public void T010_CheckValidationDisableFlag()
+        public void T006_CheckValidationDisableFlag()
         {
             var dto = new DtoOf<AnnotatedPayload>()
             {
@@ -179,7 +142,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         }
 
         [Test]
-        public void T011_ValidationOfLists()
+        public void T007_ValidationOfLists()
         {
             var dto = new DtoOf<ListPayload>() { UserId = rootUser.Id };
             var pushResult = DodbGateway.PushDto(dto);
@@ -205,38 +168,39 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         }
 
         [Test]
-        public void T012_CleanupSyncDirectoryAndSyncAgain()
+        public void T008_CleanupSyncDirectoryAndSyncAgain()
         {
             var syncDirectory = Path.Combine(FileSystemUtils.GetDefaultAppDataFolderPath(), "Sync");
             FileSystemUtils.ScanDirectoryRecursively(syncDirectory, f => File.Delete(f)); // clean up
-            DodbSyncService.SyncDocuments(syncDirectory); // should create 4 files
+            DodbSyncService.SyncDocuments(syncDirectory); // should create 5 files
 
             var filesList = new List<string>();
             FileSystemUtils.ScanDirectoryRecursively(syncDirectory, f => filesList.Add(f));
-            Assert.AreEqual(4, filesList.Count);
+            Assert.AreEqual(5, filesList.Count);
         }
 
         [Test]
-        public void T013_CheckSyncPopulateDatabase()
+        public void T009_CheckSyncPopulateDatabase()
         {
             // Make sure we have 4 files from prev. test
             var syncDirectory = Path.Combine(FileSystemUtils.GetDefaultAppDataFolderPath(), "Sync");
             var filesList = new List<string>();
             FileSystemUtils.ScanDirectoryRecursively(syncDirectory, f => filesList.Add(f));
-            Assert.AreEqual(4, filesList.Count);
+            Assert.AreEqual(5, filesList.Count);
 
             using var dbContext = new TestDbContext();
             dbContext.Documents.RemoveRange(dbContext.Documents);
+            dbContext.Users.RemoveRange(dbContext.Users);
             dbContext.SaveChanges();
             Assert.AreEqual(false, dbContext.Documents.Any());
 
             DodbSyncService.SyncDocuments(syncDirectory);
 
-            Assert.AreEqual(4, dbContext.Documents.Count());
+            Assert.AreEqual(5, dbContext.Documents.Count());
         }
 
         [Test]
-        public void T014_TryLoadPlugin()
+        public void T010_TryLoadPlugin()
         {
             var fn = BasicLogWritter.CurrentFileName;
 

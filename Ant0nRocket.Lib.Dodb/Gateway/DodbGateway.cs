@@ -1,9 +1,11 @@
 ﻿using Ant0nRocket.Lib.Dodb.Abstractions;
 using Ant0nRocket.Lib.Dodb.Attributes;
+using Ant0nRocket.Lib.Dodb.DtoPayloads;
 using Ant0nRocket.Lib.Dodb.Dtos;
 using Ant0nRocket.Lib.Dodb.Entities;
 using Ant0nRocket.Lib.Dodb.Gateway.Helpers;
 using Ant0nRocket.Lib.Dodb.Gateway.Responses;
+using Ant0nRocket.Lib.Dodb.Services;
 using Ant0nRocket.Lib.Std20.Extensions;
 using Ant0nRocket.Lib.Std20.Logging;
 using Ant0nRocket.Lib.Std20.Reflection;
@@ -19,11 +21,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
     {
         private static readonly Logger logger = Logger.Create(nameof(DodbGateway));
 
-        #region DTO handling
-
         private static bool? _isAnyDocumentExist = null;
-
-        public static bool IsAnyDocumentExist => _isAnyDocumentExist == true ? true : false;
 
         #region DbContext getter
 
@@ -43,13 +41,33 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
         #endregion
 
-        #region DTO handler
+        #region DTO handling
 
-        private static DtoPayloadHandler dtoPayloadHandler;
+        private static DtoPayloadHandler dtoPayloadHandler = null;
 
-        public static void RegisterDtoHandler(DtoPayloadHandler handler) => dtoPayloadHandler = handler;
+        public static void RegisterDtoPayloadHandler(DtoPayloadHandler handler) => dtoPayloadHandler = handler;
 
-        #endregion
+        private static GatewayResponse TryHandleDtoPayloadInternally(object dtoPayload, IDodbContext dbContext)
+        {
+            var c = dbContext;
+            return dtoPayload switch
+            {
+                #region Users service
+
+                PldCreateUser p => DodbUsersService.CreateUser(p, c),
+
+                #endregion
+
+                _ => null
+            };
+        }
+
+        private static GatewayResponse TryHandleDtoPayloadExternally(object dtoPayload, IDodbContext dbContext)
+        {
+            if (dtoPayloadHandler != null)
+                return dtoPayloadHandler(dtoPayload, dbContext);
+            return null;
+        }
 
         private static GatewayResponse PushDtoObject<TPayload>(DtoOf<TPayload> dto, IDodbContext dbContext) where TPayload : class, new()
         {
@@ -57,11 +75,10 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
             if (dbContext == default) throw new ArgumentNullException(nameof(dbContext));
             if (dbContextGetterFunc == default) throw new NullReferenceException(nameof(dbContextGetterFunc));
-            if (dtoPayloadHandler == default) throw new NullReferenceException(nameof(dtoPayloadHandler));
 
             if (_isAnyDocumentExist == null)
             {
-                _isAnyDocumentExist = CheckDocumentExist(dbContext);
+                _isAnyDocumentExist = DodbDocumentsService.CheckDocumentExist();
                 logger.LogDebug($"Any documents found? - {_isAnyDocumentExist}");
             }
 
@@ -70,7 +87,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             #region 2. Check document doesn't exists, check required document exists
 
             // Check user exists (if it's not first document!)
-            if (!CheckUserExists(dbContext, dto.UserId)) // such user not found
+            if (!DodbUsersService.CheckUserExists(dto.UserId)) // user NOT found
             {
                 if (_isAnyDocumentExist == true) // ...but some documents already exists
                 {
@@ -80,7 +97,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             }
 
             // Check document with dto.Id doesn't exist
-            if (CheckDocumentExist(dbContext, dto.Id))
+            if (DodbDocumentsService.CheckDocumentExist(dto.Id))
             {
                 logger.LogError($"Document with Id='{dto.Id}' already exists");
                 return new GrDocumentExists { DocumentId = dto.Id };
@@ -91,13 +108,16 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                 if (dto.DateCreatedUtc == DateTime.MinValue) // that means in app generated
                 {
                     dto.DateCreatedUtc = DateTime.UtcNow;
-                    dto.RequiredDocumentId = GetLatestDocumentId(dbContext);
+                    dto.RequiredDocumentId = DodbDocumentsService.GetLatestDocumentId();
                 }
                 else
                 {
-                    var message = $"Invalid DTO '{dto.Id}' with no date and no requied document ID received";
-                    logger.LogError(message);
-                    return new GrDtoIsInvalid(message);
+                    if (_isAnyDocumentExist == true) // database is NOT empty
+                    {                                // but someone send to us DTO with no RequiredDocId but with date
+                        var message = $"Invalid DTO '{dto.Id}' with no date and no requied document ID received";
+                        logger.LogError(message);
+                        return new GrDtoIsInvalid(message);
+                    }
                 }
             }
             else // if (dto.RequiredDocumentId == default) || some required document specified in DTO
@@ -109,7 +129,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                     return new GrDtoIsInvalid(message);
                 }
 
-                if (!CheckDocumentExist(dbContext, dto.RequiredDocumentId))
+                if (!DodbDocumentsService.CheckDocumentExist(dto.RequiredDocumentId))
                 {
                     logger.LogWarning($"DTO '{dto.Id}' requires Document '{dto.RequiredDocumentId}' which is not found");
                     return new GrRequiredDocumentNotFound
@@ -124,7 +144,16 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
             #region Handling DTO, saving document
 
-            var dtoHandleResponse = dtoPayloadHandler(dto.Payload, dbContext);
+            if (_isAnyDocumentExist == false && dto.Payload is PldCreateUser p)
+            {
+                dto.UserId = p.Id;
+                logger.LogWarning($"First document creates a user! It's OK!");
+            }
+
+            var dtoHandleResponse = // first, try internal handler, and if not (it will return null) drop to registred
+                TryHandleDtoPayloadInternally(dto.Payload, dbContext) ?? 
+                TryHandleDtoPayloadExternally(dto.Payload, dbContext) ??
+                new GrDtoPayloadHandlerNotFound();
 
             var isDtoHandledSuccessfully = AttributeUtils
                 .GetAttribute<IsSuccessAttribute>(dtoHandleResponse.GetType())?.IsSuccess ?? true;
@@ -157,42 +186,8 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
         }
 
         /// <summary>
-        /// Checks specified by <paramref name="userId"/> user exists.
-        /// </summary>
-        private static bool CheckUserExists(IDodbContext dbContext, Guid userId = default)
-        {
-            return dbContext.Users.AsNoTracking().Any(u => u.Id == userId);
-        }
-
-        /// <summary>
-        /// Checks any document (default <paramref name="documentId"/>) or
-        /// specified by <paramref name="documentId"/> exists.
-        /// </summary>
-        private static bool CheckDocumentExist(IDodbContext dbContext, Guid documentId = default)
-        {
-            var query = dbContext.Documents.AsNoTracking();
-
-            if (documentId != default)
-                query = query.Where(d => d.Id == documentId);
-
-            return query.Any();
-        }
-
-        /// <summary>
-        /// Gets the latest document Id or empty Guid if no documents found.
-        /// </summary>
-        private static Guid GetLatestDocumentId(IDodbContext dbContext)
-        {
-            return dbContext
-                    .Documents
-                    .AsNoTracking()
-                    .OrderByDescending(d => d.DateCreatedUtc)
-                    .FirstOrDefault()?.Id ?? Guid.Empty;
-        }
-
-        /// <summary>
         /// 1. Throws <see cref="NullReferenceException"/> if you forgot to register ContextGetter (see <see cref="RegisterDbContextGetterFunc(Func{IDodbContext})"/>).<br /> 
-        /// 2. Throws <see cref="NullReferenceException"/> if you forgot to register DtoHandler (see <see cref="RegisterDtoHandler(DtoPayloadHandler)"/>).<br />
+        /// 2. Throws <see cref="NullReferenceException"/> if you forgot to register DtoHandler (see <see cref="RegisterDtoPayloadHandler(DtoPayloadHandler)"/>).<br />
         /// 3. Returnes <see cref="GrDtoIsInvalid"/> if there are some validation errors in DTO or its payload.<br />
         /// 4. Returnes <see cref="GrDocumentExists"/> if any document with <paramref name="dto"/>.Id already exists.<br />
         /// 5. Returnes <see cref="GrRequiredDocumentNotFound"/> if there is some document required to exist but not found.<br />
@@ -241,12 +236,6 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
             return pushResult;
         }
-
-        #endregion
-
-        #region Users managing
-
-
 
         #endregion
     }

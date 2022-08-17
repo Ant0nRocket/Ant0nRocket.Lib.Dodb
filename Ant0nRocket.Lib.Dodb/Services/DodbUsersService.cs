@@ -61,6 +61,15 @@ namespace Ant0nRocket.Lib.Dodb.Services
         }
 
         /// <summary>
+        /// Checks specified by <paramref name="userId"/> user exists.
+        /// </summary>
+        public static bool CheckUserExists(Guid userId)
+        {
+            using var dbContext = DodbGateway.GetDbContext();
+            return dbContext.Users.AsNoTracking().Any(u => u.Id == userId);
+        }
+
+        /// <summary>
         /// Returnes a list of known usernames that is not
         /// deleted and not hidden.
         /// </summary>
@@ -102,18 +111,13 @@ namespace Ant0nRocket.Lib.Dodb.Services
             return dbContext.Users.Count();
         }
 
-
-        #endregion // Public functions
-
-        #region Internal functions (used by PushDto method)
-
         /// <summary>
         /// Creates a User described in <paramref name="dtoPayload"/>.<br />
         /// Returnes <see cref="GrCreateUser_Exists"/> if <see cref="User"/> 
         /// with specified Name exists.<br />
         /// Returnes <see cref="GrCreateUser_Success"/> if new User create success.
         /// </summary>
-        internal static GatewayResponse CreateUser(PldCreateUser dtoPayload, IDodbContext dbContext)
+        public static GatewayResponse CreateUser(PldCreateUser dtoPayload, IDodbContext dbContext)
         {
             var user = dbContext
                 .Users
