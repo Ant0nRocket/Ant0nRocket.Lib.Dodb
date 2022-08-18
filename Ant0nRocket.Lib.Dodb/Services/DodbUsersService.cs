@@ -40,9 +40,9 @@ namespace Ant0nRocket.Lib.Dodb.Services
         /// Returnes <see cref="Responces.DodbUsersService.GrAuth_Failed"/> if username or password incorrect.<br />
         /// Returnes <see cref="Responces.DodbUsersService.GrAuth_Success"/> if authentication success.
         /// </summary>
-        public static GatewayResponse Auth(string userName, string password)
+        public static GatewayResponse Auth(string userName, string plainPassword)
         {
-            var passwordHash = CalcPasswordHash(password);
+            var passwordHash = CalcPasswordHash(plainPassword);
             using var dbContext = DodbGateway.GetDbContext();
 
             var user = dbContext
