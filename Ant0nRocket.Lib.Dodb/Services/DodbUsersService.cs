@@ -54,7 +54,6 @@ namespace Ant0nRocket.Lib.Dodb.Services
         {
             var passwordHash = CalcPasswordHash(plainPassword);
             _logger.LogDebug($"Trying authenticate '{userName}', password hash '{passwordHash}'");
-            _logger.LogDebug($"Password is '{plainPassword}' (length={plainPassword.Length})");
 
             using var dbContext = DodbGateway.GetDbContext();
 
