@@ -4,12 +4,16 @@ using Ant0nRocket.Lib.Dodb.Entities;
 using Ant0nRocket.Lib.Dodb.Gateway;
 using Ant0nRocket.Lib.Dodb.Services.Responces.DodbUsersService;
 using Ant0nRocket.Lib.Std20.Cryptography;
+using Ant0nRocket.Lib.Std20.Extensions;
 using Ant0nRocket.Lib.Std20.Logging;
 
 using Microsoft.EntityFrameworkCore;
 
 namespace Ant0nRocket.Lib.Dodb.Services
 {
+    /// <summary>
+    /// Basic user management service.
+    /// </summary>
     public static class DodbUsersService
     {
         private static readonly Logger _logger = Logger.Create(nameof(DodbUsersService));
@@ -18,6 +22,10 @@ namespace Ant0nRocket.Lib.Dodb.Services
 
         #region Public functions
 
+        /// <summary>
+        /// Performs registration of external hashing function. Usefull when you need
+        /// to add some salt to password, etc.
+        /// </summary>
         public static void RegisterPasswordHasherFunc(Func<string, string> func) =>
             _passwordHasherFunc = func;
 
@@ -30,9 +38,11 @@ namespace Ant0nRocket.Lib.Dodb.Services
         {
             if (_passwordHasherFunc == null)
             {
-                return Hasher.CalculateHash(password);
+                _logger.LogDebug("Hashing password using internal hash function");
+                return Hasher.ComputeHash(password).ToHexString();
             }
 
+            _logger.LogDebug("Hashing password using external hash function");
             return _passwordHasherFunc(password);
         }
 
@@ -43,6 +53,9 @@ namespace Ant0nRocket.Lib.Dodb.Services
         public static GatewayResponse Auth(string userName, string plainPassword)
         {
             var passwordHash = CalcPasswordHash(plainPassword);
+            _logger.LogDebug($"Trying authenticate '{userName}', password hash '{passwordHash}'");
+            _logger.LogDebug($"Password is '{plainPassword}' (length={plainPassword.Length})");
+
             using var dbContext = DodbGateway.GetDbContext();
 
             var user = dbContext
@@ -139,6 +152,6 @@ namespace Ant0nRocket.Lib.Dodb.Services
             }
         }
 
-        #endregion // Internal functions
+#endregion // Internal functions
     }
 }
