@@ -33,9 +33,19 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
         private static Func<IDodbContext> dbContextGetterFunc;
 
+        /// <summary>
+        /// Library itself doesn't know about actual DbContext you will use in your
+        /// application, but it know that it must implement <see cref="IDodbContext"/>.<br />
+        /// So your app must register context getter.
+        /// </summary>
         public static void RegisterDbContextGetterFunc(Func<IDodbContext> value) =>
             dbContextGetterFunc = value;
 
+        /// <summary>
+        /// Returnes a DbContext with function that was registered with
+        /// <see cref="RegisterDbContextGetterFunc(Func{IDodbContext})"/>.
+        /// </summary>
+        /// <returns></returns>
         public static IDodbContext GetDbContext() =>
             dbContextGetterFunc?.Invoke();
 
@@ -45,6 +55,10 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
         private static DtoPayloadHandler dtoPayloadHandler = null;
 
+        /// <summary>
+        /// By default lib can handle only build-in payload types.<br />
+        /// Provide your own handler to be able to deal with your types.
+        /// </summary>
         public static void RegisterDtoPayloadHandler(DtoPayloadHandler handler) => dtoPayloadHandler = handler;
 
         private static GatewayResponse TryHandleDtoPayloadInternally(object dtoPayload, IDodbContext dbContext)
