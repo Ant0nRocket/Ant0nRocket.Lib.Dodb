@@ -2,21 +2,22 @@
 
 using Ant0nRocket.Lib.Dodb.Abstractions;
 using Ant0nRocket.Lib.Dodb.Dtos;
+using Ant0nRocket.Lib.Std20.Extensions;
 
 namespace Ant0nRocket.Lib.Dodb.Gateway.Helpers
 {
-    internal class DtoValidator<T> where T : class, new()
+    internal class DtoValidator
     {
-        private readonly DtoOf<T> dto;
+        private readonly Dto dto;
 
         public List<string> ErrorsList { get; private set; }
 
-        public DtoValidator(DtoOf<T> dto)
+        public DtoValidator(Dto dto)
         {
             this.dto = dto;
         }
 
-        public DtoValidator<T> Validate()
+        public DtoValidator Validate()
         {
             ErrorsList ??= new();
             ErrorsList.Clear();
@@ -26,13 +27,13 @@ namespace Ant0nRocket.Lib.Dodb.Gateway.Helpers
                 ErrorsList.Add($"{nameof(dto.Id)} is not set");
 
             // Check payload using annotations
-            var validationContext = new ValidationContext(dto.Payload);
+            var dtoPayload = dto.GetPropertyValue("Payload");
+            var validationContext = new ValidationContext(dtoPayload);
             var validationResults = new List<ValidationResult>();
-            if (!Validator.TryValidateObject(dto.Payload, validationContext, validationResults, validateAllProperties: true))
+            if (!Validator.TryValidateObject(dtoPayload, validationContext, validationResults, validateAllProperties: true))
                 validationResults.ForEach(vr => ErrorsList.Add(vr.ErrorMessage));
 
-            var typeOfPayload = typeof(T);
-            if (dto.Payload is IValidateablePayload validateablePayload)
+            if (dtoPayload is IValidateablePayload validateablePayload)
                 validateablePayload.Validate(ErrorsList);
 
             return this;

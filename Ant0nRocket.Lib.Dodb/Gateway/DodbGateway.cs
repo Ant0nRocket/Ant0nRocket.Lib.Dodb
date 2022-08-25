@@ -83,7 +83,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             return null;
         }
 
-        private static GatewayResponse PushDtoObject<TPayload>(DtoOf<TPayload> dto, IDodbContext dbContext) where TPayload : class, new()
+        private static GatewayResponse PushDtoObject(Dto dto, IDodbContext dbContext)
         {
             #region 1. Checking handlers and values
 
@@ -158,15 +158,20 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
             #region Handling DTO, saving document
 
-            if (_isAnyDocumentExist == false && dto.Payload is PldCreateUser p)
+            var dtoType = dto.GetType();
+            var dtoPayloadPropertyInfo = dtoType.GetProperties().FirstOrDefault(p => p.Name == "Payload") ??
+                throw new ArgumentException("DTO doesn't have a Payload property");
+            var dtoPayload = dtoPayloadPropertyInfo.GetValue(dto);
+
+            if (_isAnyDocumentExist == false && dtoPayload is PldCreateUser p)
             {
                 dto.UserId = p.Id;
                 logger.LogWarning($"First document creates a user! It's OK!");
             }
 
             var dtoHandleResponse = // first, try internal handler, and if not (it will return null) drop to registred
-                TryHandleDtoPayloadInternally(dto.Payload, dbContext) ?? 
-                TryHandleDtoPayloadExternally(dto.Payload, dbContext) ??
+                TryHandleDtoPayloadInternally(dtoPayload, dbContext) ?? 
+                TryHandleDtoPayloadExternally(dtoPayload, dbContext) ??
                 new GrDtoPayloadHandlerNotFound();
 
             var isDtoHandledSuccessfully = AttributeUtils
@@ -186,8 +191,8 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                 RequiredDocumentId = dto.RequiredDocumentId,
                 DateCreatedUtc = dto.DateCreatedUtc,
                 Description = dto.Description,
-                PayloadType = $"{dto.Payload.GetType()}",
-                Payload = dto.Payload.AsJson()
+                PayloadType = $"{dtoPayload.GetType()}",
+                Payload = dtoPayload.AsJson()
             };
 
             dbContext.Documents.Add(document);
@@ -215,12 +220,9 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
         /// If <paramref name="externalDbContext"/> passed then all transaction control, saving, disposing - is not 
         /// a business of current function. If you need just push DTO and commit it - dont set <paramref name="externalDbContext"/>!
         /// </summary>
-        public static GatewayResponse PushDto<TPayload>(
-            DtoOf<TPayload> dto,
-            IDodbContext externalDbContext = default
-        ) where TPayload : class, new()
+        public static GatewayResponse PushDto(Dto dto, IDodbContext externalDbContext = default)
         {
-            var validator = new DtoValidator<TPayload>(dto).Validate();
+            var validator = new DtoValidator(dto).Validate();
             if (validator.HasFoundErrors)
             {
                 logger.LogError($"Invalid DTO '{dto.Id}': {string.Join(", ", validator.ErrorsList)}");
