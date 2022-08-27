@@ -16,12 +16,34 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 {
     /// <summary>
     /// A gateway for document-oriented database.<br />
+    /// Before using this in your project execute:
+    /// <code>
+    ///     DodbGateway.RegisterDbContextGetterFunc([...function that will return DbContext...]);
+    ///     DodbGateway.RegisterKnownPayloadTypes();
+    ///     DodbGateway.RegisterDtoPayloadHandler([...Method that will handle your Dto objects...]);
+    /// </code>
     /// </summary>
     public static class DodbGateway
     {
+        #region Private fields
+
         private static readonly Logger logger = Logger.Create(nameof(DodbGateway));
 
+        private static bool _isKnownPayloadTypesRegistred = false;
+
         private static bool? _isAnyDocumentExist = null;
+
+        private static readonly Dictionary<string, int> _payloadType_Id_Cache = new();
+
+        #endregion
+
+        #region Constants
+
+        private const string ERROR_GETTING_DBCONTEXT = $"Can't create DbContext. Check {nameof(RegisterDbContextGetterFunc)} were called.";
+        private const string ERROR_NEED_REGISTER_IPAYLOADS = $"Call {nameof(RegisterKnownPayloadTypes)} to register IPayload classes";
+        private const string ERROR_IPAYLOADS_REG_FAILED = "Failed to register IPayload classes";
+
+        #endregion
 
         #region DbContext getter
 
@@ -31,7 +53,18 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
          As you DbContext will be somewhere in external library we need to know how to get it.
          */
 
-        private static Func<IDodbContext> dbContextGetterFunc;
+        private static Func<IDodbContext>? dbContextGetterFunc;
+
+        /// <summary>
+        /// Returnes a DbContext with function that was registered with
+        /// <see cref="RegisterDbContextGetterFunc(Func{IDodbContext})"/>.
+        /// </summary>
+        internal static IDodbContext? GetDbContext() =>
+            dbContextGetterFunc?.Invoke();
+
+        #endregion
+
+        #region Registrators
 
         /// <summary>
         /// Library itself doesn't know about actual DbContext you will use in your
@@ -42,41 +75,74 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             dbContextGetterFunc = value;
 
         /// <summary>
-        /// Returnes a DbContext with function that was registered with
-        /// <see cref="RegisterDbContextGetterFunc(Func{IDodbContext})"/>.
-        /// </summary>
-        /// <returns></returns>
-        public static IDodbContext GetDbContext() =>
-            dbContextGetterFunc?.Invoke();
-
-        #endregion
-
-        #region DTO handling
-
-        private static DtoPayloadHandler dtoPayloadHandler = null;
-
-        /// <summary>
         /// By default lib can handle only build-in payload types.<br />
         /// Provide your own handler to be able to deal with your types.
         /// </summary>
         public static void RegisterDtoPayloadHandler(DtoPayloadHandler handler) => dtoPayloadHandler = handler;
 
-        private static GatewayResponse TryHandleDtoPayloadInternally(object dtoPayload, IDodbContext dbContext)
+        /// <summary>
+        /// Goes through current app domain and register all classes of type IPayload
+        /// in database.
+        /// </summary>
+        public static bool RegisterKnownPayloadTypes()
+        {
+            if (_isKnownPayloadTypesRegistred) return true;
+
+            using var dbContext = GetDbContext() ??
+                throw new ApplicationException($"Call {nameof(RegisterDbContextGetterFunc)} first");
+
+            var knownPayloadTypesFromReflection = ReflectionUtils.GetClassesThatImplementsInterface<IPayload>();
+            var knownPayloadTypesFromDatabase = dbContext
+                .PayloadTypes
+                .AsNoTracking()
+                .Select(p => p.TypeName)
+                .ToList();
+
+            var payloadTypesToAdd = new HashSet<string>();
+
+            foreach (var payloadTypeFromReflection in knownPayloadTypesFromReflection)
+            {
+                if (!knownPayloadTypesFromDatabase.Contains(payloadTypeFromReflection.FullName))
+                {
+                    payloadTypesToAdd.AddSecure(payloadTypeFromReflection.FullName ??
+                        throw new NullReferenceException("Name of a type is null"));
+                }
+            }
+
+            foreach (var typeName in payloadTypesToAdd)
+                dbContext.PayloadTypes.Add(new PayloadType { TypeName = typeName });
+
+            if (payloadTypesToAdd.Count > 0)
+                if (dbContext.SaveChanges() <= 0)
+                    throw new ApplicationException(ERROR_IPAYLOADS_REG_FAILED);
+
+            dbContext.PayloadTypes.ToList().ForEach(pt => {
+                var typeName = pt.TypeName ?? throw new NullReferenceException();
+                _payloadType_Id_Cache.Add(typeName, pt.Id);
+            });
+
+            _isKnownPayloadTypesRegistred = true;
+
+            return true; // no changes or add success
+        }
+
+        #endregion
+
+        #region DTO handling
+
+        private static DtoPayloadHandler? dtoPayloadHandler = null;
+
+        private static GatewayResponse? TryHandleDtoPayloadInternally(object dtoPayload, IDodbContext dbContext)
         {
             var c = dbContext;
             return dtoPayload switch
             {
-                #region Users service
-
                 PldCreateUser p => DodbUsersService.CreateUser(p, c),
-
-                #endregion
-
                 _ => null
             };
         }
 
-        private static GatewayResponse TryHandleDtoPayloadExternally(object dtoPayload, IDodbContext dbContext)
+        private static GatewayResponse? TryHandleDtoPayloadExternally(object dtoPayload, IDodbContext dbContext)
         {
             if (dtoPayloadHandler != null)
                 return dtoPayloadHandler(dtoPayload, dbContext);
@@ -87,8 +153,8 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
         {
             #region 1. Checking handlers and values
 
-            if (dbContext == default) throw new ArgumentNullException(nameof(dbContext));
             if (dbContextGetterFunc == default) throw new NullReferenceException(nameof(dbContextGetterFunc));
+            if (!_isKnownPayloadTypesRegistred) throw new ApplicationException(ERROR_NEED_REGISTER_IPAYLOADS);
 
             if (_isAnyDocumentExist == null)
             {
@@ -161,7 +227,8 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             var dtoType = dto.GetType();
             var dtoPayloadPropertyInfo = dtoType.GetProperties().FirstOrDefault(p => p.Name == "Payload") ??
                 throw new ArgumentException("DTO doesn't have a Payload property");
-            var dtoPayload = dtoPayloadPropertyInfo.GetValue(dto);
+            var dtoPayload = dtoPayloadPropertyInfo.GetValue(dto) ??
+                throw new InvalidDataException("Can't get a value of Dto.Payload");
 
             if (_isAnyDocumentExist == false && dtoPayload is PldCreateUser p)
             {
@@ -170,7 +237,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             }
 
             var dtoHandleResponse = // first, try internal handler, and if not (it will return null) drop to registred
-                TryHandleDtoPayloadInternally(dtoPayload, dbContext) ?? 
+                TryHandleDtoPayloadInternally(dtoPayload, dbContext) ??
                 TryHandleDtoPayloadExternally(dtoPayload, dbContext) ??
                 new GrDtoPayloadHandlerNotFound();
 
@@ -191,8 +258,8 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                 RequiredDocumentId = dto.RequiredDocumentId,
                 DateCreatedUtc = dto.DateCreatedUtc,
                 Description = dto.Description,
-                PayloadType = $"{dtoPayload.GetType()}",
-                Payload = dtoPayload.AsJson()
+                PayloadTypeId = GetPayloadTypeId(dtoPayload),
+                PayloadJson = dtoPayload.AsJson()
             };
 
             dbContext.Documents.Add(document);
@@ -202,6 +269,14 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             #endregion
 
             return dtoHandleResponse;
+        }
+
+        private static int GetPayloadTypeId(object dtoPayload)
+        {
+            var typeName = dtoPayload.GetType().FullName ?? string.Empty;
+            if (_payloadType_Id_Cache.ContainsKey(typeName))
+                return _payloadType_Id_Cache[typeName];
+            return int.MinValue;
         }
 
         /// <summary>
@@ -220,7 +295,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
         /// If <paramref name="externalDbContext"/> passed then all transaction control, saving, disposing - is not 
         /// a business of current function. If you need just push DTO and commit it - dont set <paramref name="externalDbContext"/>!
         /// </summary>
-        public static GatewayResponse PushDto(Dto dto, IDodbContext externalDbContext = default)
+        public static GatewayResponse PushDto(Dto dto, IDodbContext? externalDbContext = default)
         {
             var validator = new DtoValidator(dto).Validate();
             if (validator.HasFoundErrors)
@@ -229,14 +304,16 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                 return new GrDtoIsInvalid(validator.ErrorsList);
             }
 
-            var dbContext = externalDbContext ?? GetDbContext();
+            var dbContext = externalDbContext ?? GetDbContext() ??
+                throw new NullReferenceException(ERROR_GETTING_DBCONTEXT);
+
             var pushResult = PushDtoObject(dto, dbContext);
 
             if (externalDbContext == default)
             {
                 try
                 {
-                    dbContext.SaveChanges();
+                    dbContext?.SaveChanges();
                 }
                 catch (Exception ex)
                 {
@@ -246,12 +323,25 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                 }
                 finally
                 {
-                    dbContext.Dispose();
+                    dbContext?.Dispose();
                 }
             }
 
             return pushResult;
         }
+
+        #endregion
+
+        #region Internal helper functions
+
+        /// <summary>
+        /// Determines whether DodbGateway know about type with FullName=<paramref name="typeName"/>.<br />
+        /// <b>N.B.!</b> "Know about" and "can handle" are two different things!<br />
+        /// In our case "know about" means that type with <paramref name="typeName"/> exists somewhere
+        /// in current app domain.
+        /// </summary>
+        internal static bool CanGatewayHandlePayloadType(string typeName) => 
+            _payloadType_Id_Cache.ContainsKey(typeName);
 
         #endregion
     }

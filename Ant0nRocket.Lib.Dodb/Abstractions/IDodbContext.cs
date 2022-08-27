@@ -18,6 +18,11 @@ namespace Ant0nRocket.Lib.Dodb.Abstractions
         DbSet<Document> Documents { get; set; }
 
         /// <summary>
+        /// Payload types with ordinal Id.
+        /// </summary>
+        DbSet<PayloadType> PayloadTypes { get; set; }
+
+        /// <summary>
         /// Set of <see cref="Entities.User"/>
         /// </summary>
         DbSet<User> Users { get; set; }

@@ -43,7 +43,7 @@ namespace Ant0nRocket.Lib.Dodb.Services
         /// <paramref name="excludePayload"/> could be set to true if you know that payload 
         /// is very heavy and there is no need to read it from database.
         /// </summary>
-        public static Document GetDocument(Guid documentId, bool excludePayload = false)
+        public static Document? GetDocument(Guid documentId, bool excludePayload = false)
         {
             using var dbContext = DodbGateway.GetDbContext();
             var query = dbContext

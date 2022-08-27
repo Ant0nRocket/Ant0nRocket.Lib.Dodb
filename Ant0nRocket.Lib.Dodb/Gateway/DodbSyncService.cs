@@ -197,6 +197,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                     .Documents
                     .AsNoTracking()
                     .Where(d => d.Id == documentId)
+                    .Include(d => d.PayloadType)
                     .First(); // we are sure it exists
 
                 var documentJsonValue = document.AsJson();
@@ -234,10 +235,10 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                     continue;
                 }
 
-                var payloadType = ReflectionUtils.FindTypeAccrossAppDomain(document.PayloadType);
+                var payloadType = ReflectionUtils.FindTypeAccrossAppDomain(document.PayloadType?.TypeName);
                 if (payloadType == null)
                 {
-                    logger.LogError($"Type '{document.PayloadType}' from '{document.Id}' doesn't exists in current app domain");
+                    logger.LogError($"Type '{document.PayloadType?.TypeName}' from '{document.Id}' doesn't exists in current app domain");
                     continue;
                 }
 
@@ -247,7 +248,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                     UserId = document.UserId,
                     RequiredDocumentId = document.RequiredDocumentId,
                     DateCreatedUtc = document.DateCreatedUtc,
-                    Payload = FileSystemUtils.GetSerializer().Deserialize(document.Payload, payloadType),
+                    Payload = FileSystemUtils.GetSerializer().Deserialize(document.PayloadJson, payloadType),
                 };
 
                 var pushResult = DodbGateway.PushDto(dto);

@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Linq;
 
 using Ant0nRocket.Lib.Dodb.Abstractions;
 using Ant0nRocket.Lib.Dodb.DtoPayloads;
@@ -61,14 +60,6 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         {
             var usersCount = DodbUsersService.GetUsersCount();
             Assert.AreEqual(1, usersCount);
-        }
-
-        [Test]
-        public void T003_CheckAtLeastOneAdminExists()
-        {
-            using var dbContext = DodbGateway.GetDbContext();
-            var admins = dbContext.Users.Where(u => u.IsAdmin).Count();
-            Assert.GreaterOrEqual(admins, 1);
         }
 
         [Test]

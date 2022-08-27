@@ -1,6 +1,8 @@
-﻿using Ant0nRocket.Lib.Dodb.Abstractions;
+﻿using System;
+
+using Ant0nRocket.Lib.Dodb.Abstractions;
+using Ant0nRocket.Lib.Dodb.DtoPayloads;
 using Ant0nRocket.Lib.Dodb.Dtos;
-using Ant0nRocket.Lib.Dodb.Entities;
 using Ant0nRocket.Lib.Dodb.Gateway;
 using Ant0nRocket.Lib.Dodb.Gateway.Responses;
 using Ant0nRocket.Lib.Dodb.Tests.Contexts;
@@ -8,16 +10,10 @@ using Ant0nRocket.Lib.Dodb.Tests.Dto.Payloads;
 using Ant0nRocket.Lib.Dodb.Tests.Entities;
 using Ant0nRocket.Lib.Dodb.Tests.Services;
 using Ant0nRocket.Lib.Std20;
-using Ant0nRocket.Lib.Std20.IO;
 using Ant0nRocket.Lib.Std20.Logging;
 using Ant0nRocket.Lib.Std20.Testing;
 
 using NUnit.Framework;
-
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 
 namespace Ant0nRocket.Lib.Dodb.Tests
 {
@@ -32,6 +28,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
             Logger.LogToBasicLogWritter = true;
 
             DodbGateway.RegisterDbContextGetterFunc(new Func<IDodbContext>(() => new TestDbContext()));
+            DodbGateway.RegisterKnownPayloadTypes();
             DodbGateway.RegisterDtoPayloadHandler(DtoHandlerMethod);
         }
 

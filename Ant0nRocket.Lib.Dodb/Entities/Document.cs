@@ -1,5 +1,7 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
+using Newtonsoft.Json;
+
 namespace Ant0nRocket.Lib.Dodb.Entities
 {
     /// <summary>
@@ -20,6 +22,7 @@ namespace Ant0nRocket.Lib.Dodb.Entities
         /// <summary>
         /// Instance of the <see cref="Entities.User"/> that created this Document.
         /// </summary>
+        [JsonIgnore]
         public User? User { get; set; }
 
         /// <summary>
@@ -33,12 +36,15 @@ namespace Ant0nRocket.Lib.Dodb.Entities
         /// A payload of a DTO, that created this document, serialized as JSON.
         /// </summary>
         [Required]
-        public string? Payload { get; set; }
+        public string? PayloadJson { get; set; }
 
-        /// <summary>
-        /// CLR-type of a payload of a DTO that created this document.
-        /// </summary>
-        public string? PayloadType { get; set; }
+        /// <inheritdoc cref="PayloadType.Id"/>
+        [JsonIgnore]
+        public int PayloadTypeId { get; set; }
+
+
+        /// <inheritdoc cref="Entities.PayloadType"/>
+        public PayloadType? PayloadType { get; set; }
 
         /// <summary>
         /// Comment from user.
