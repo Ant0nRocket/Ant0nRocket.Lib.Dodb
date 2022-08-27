@@ -232,7 +232,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
             if (_isAnyDocumentExist == false && dtoPayload is PldCreateUser p)
             {
-                dto.UserId = p.UserId;
+                dto.UserId = p.Value.Id;
                 logger.LogWarning($"Created user will be an author of a document, 'cause it's a first document!");
             }
 

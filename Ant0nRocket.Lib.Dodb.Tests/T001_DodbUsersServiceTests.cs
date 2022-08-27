@@ -22,14 +22,19 @@ namespace Ant0nRocket.Lib.Dodb.Tests
             string userName,
             string plainPassword,
             bool isAdmin = false,
-            bool isHidden = false)
+            bool isHidden = false,
+            bool sameUserIdInDtoAndPayload = false)
         {
             var dto = new DtoOf<PldCreateUser>();
             dto.UserId = documentAuthorId;
-            dto.Payload.Name = userName;
-            dto.Payload.PasswordHash = DodbUsersService.CalcPasswordHash(plainPassword);
-            dto.Payload.IsAdmin = isAdmin;
-            dto.Payload.IsHidden = isHidden;
+            dto.Payload.Value.Name = userName;
+            dto.Payload.Value.PasswordHash = DodbUsersService.CalcPasswordHash(plainPassword);
+            dto.Payload.Value.IsAdmin = isAdmin;
+            dto.Payload.Value.IsHidden = isHidden;
+
+            if (sameUserIdInDtoAndPayload)
+                dto.UserId = dto.Payload.Value.Id;
+
             return DodbGateway.PushDto(dto);
         }
 
@@ -47,7 +52,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         {
             LogStart();
 
-            var createResult = CreateUser(default, "root", "root", true, true);
+            var createResult = CreateUser(default, "root", "root", isAdmin: true, isHidden: true, sameUserIdInDtoAndPayload: true);
             Assert.That(createResult is GrCreateUser_Success);
             AuthUser("root", "root", out rootUser);
             Assert.That(rootUser is not null);

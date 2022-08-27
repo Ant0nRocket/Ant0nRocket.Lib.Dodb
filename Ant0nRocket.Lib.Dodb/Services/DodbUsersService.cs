@@ -134,26 +134,18 @@ namespace Ant0nRocket.Lib.Dodb.Services
             var user = dbContext
                 .Users
                 .AsNoTracking()
-                .Where(u => u.Name == dtoPayload.Name.Trim())
+                .Where(u => u.Name == dtoPayload.Value.Name)
                 .FirstOrDefault();
 
             if (user != default) // user exists
             {
-                _logger.LogWarning($"User with a username='{dtoPayload.Name}' already exists");
+                _logger.LogWarning($"User with a username='{dtoPayload.Value.Name}' already exists");
                 return new GrCreateUser_Exists();
             }
             else // user is new
             {
-                _logger.LogInformation($"User '{dtoPayload.Name}' created");
-                dbContext.Users.Add(new User
-                {
-                    Id = dtoPayload.UserId,
-                    Name = dtoPayload.Name,
-                    PasswordHash = dtoPayload.PasswordHash,
-                    IsAdmin = dtoPayload.IsAdmin,
-                    IsHidden = dtoPayload.IsHidden,
-                    DateCreatedUtc = DateTime.UtcNow,
-                });
+                _logger.LogInformation($"User '{dtoPayload.Value.Name}' created");
+                dbContext.Users.Add(dtoPayload.Value);
                 dbContext.SaveChanges();
                 return new GrCreateUser_Success();
             }

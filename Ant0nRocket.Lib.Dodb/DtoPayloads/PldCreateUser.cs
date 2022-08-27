@@ -1,39 +1,18 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
 using Ant0nRocket.Lib.Dodb.Abstractions;
+using Ant0nRocket.Lib.Dodb.Entities;
 
 namespace Ant0nRocket.Lib.Dodb.DtoPayloads
 {
     /// <summary>
     /// Payload for creating a new user.
     /// </summary>
-    public class PldCreateUser : DtoPayloadBase, IValidateablePayload
+    public class PldCreateUser : DtoPayloadBase
     {
         /// <summary>
-        /// Unique Id of a user.<br />
-        /// By default - new GUID.
+        /// Default <see cref="User"/> value.
         /// </summary>
-        public Guid UserId { get; set; } = Guid.NewGuid();
-
-        /// <inheritdoc cref="Entities.User.Name"/>
-        [Required]
-        [MinLength(1)]
-        public string Name { get; set; }
-
-        /// <inheritdoc cref="Entities.User.PasswordHash"/>
-        [Required]
-        public string PasswordHash { get; set; }
-
-        /// <inheritdoc cref="Entities.User.IsAdmin"/>
-        public bool IsAdmin { get; set; } = false;
-
-        /// <inheritdoc cref="Entities.User.IsHidden"/>
-        public bool IsHidden { get; set; } = false;
-
-        /// <inheritdoc />
-        public void Validate(List<string> errorsList)
-        {
-
-        }
+        public User Value { get; set; } = new();
     }
 }
