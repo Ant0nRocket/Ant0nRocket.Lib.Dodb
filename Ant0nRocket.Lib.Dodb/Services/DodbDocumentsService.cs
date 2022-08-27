@@ -6,6 +6,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Ant0nRocket.Lib.Dodb.Services
 {
+    /// <summary>
+    /// Basic Documents service.
+    /// </summary>
     public static class DodbDocumentsService
     {
         private static readonly Logger _logger = Logger.Create(nameof(DodbDocumentsService));
@@ -17,12 +20,12 @@ namespace Ant0nRocket.Lib.Dodb.Services
         public static bool CheckDocumentExist(Guid documentId = default)
         {
             using var dbContext = DodbGateway.GetDbContext();
-            var query = dbContext.Documents.AsNoTracking();
+            var query = dbContext?.Documents.AsNoTracking();
 
             if (documentId != default)
-                query = query.Where(d => d.Id == documentId);
+                query = query?.Where(d => d.Id == documentId);
 
-            return query.Any();
+            return query?.Any() ?? false;
         }
 
         /// <summary>
@@ -31,11 +34,20 @@ namespace Ant0nRocket.Lib.Dodb.Services
         public static Guid GetLatestDocumentId()
         {
             using var dbContext = DodbGateway.GetDbContext();
-            return dbContext
+            return dbContext?
                     .Documents
                     .AsNoTracking()
                     .OrderByDescending(d => d.DateCreatedUtc)
                     .FirstOrDefault()?.Id ?? Guid.Empty;
+        }
+
+        /// <summary>
+        /// Returnes count of all documents.
+        /// </summary>
+        public static long GetDocumentsCount()
+        {
+            using var dbContext = DodbGateway.GetDbContext();
+            return dbContext?.Documents.LongCount() ?? 0;
         }
 
         /// <summary>
@@ -46,13 +58,13 @@ namespace Ant0nRocket.Lib.Dodb.Services
         public static Document? GetDocument(Guid documentId, bool excludePayload = false)
         {
             using var dbContext = DodbGateway.GetDbContext();
-            var query = dbContext
+            var query = dbContext?
                 .Documents
                 .AsNoTracking()
                 .Where(d => d.Id == documentId);
 
             if (excludePayload)
-                query = query.Select(d => new Document
+                query = query?.Select(d => new Document
                 {
                     Id = d.Id,
                     UserId = d.UserId,
@@ -62,7 +74,7 @@ namespace Ant0nRocket.Lib.Dodb.Services
                     DateCreatedUtc = d.DateCreatedUtc,
                 });
 
-            return query.SingleOrDefault();
+            return query?.SingleOrDefault();
         }
     }
 }

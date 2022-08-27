@@ -84,9 +84,11 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
         /// Goes through current app domain and register all classes of type IPayload
         /// in database.
         /// </summary>
-        public static bool RegisterKnownPayloadTypes()
+        public static bool RegisterKnownPayloadTypes(bool forceCacheRecreation = false)
         {
-            if (_isKnownPayloadTypesRegistred) return true;
+            if (_isKnownPayloadTypesRegistred && !forceCacheRecreation) return true;
+
+            _payloadType_Id_Cache.Clear();
 
             using var dbContext = GetDbContext() ??
                 throw new ApplicationException($"Call {nameof(RegisterDbContextGetterFunc)} first");
