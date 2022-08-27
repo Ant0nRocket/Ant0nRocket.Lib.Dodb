@@ -1,9 +1,11 @@
 ﻿using System;
 using System.ComponentModel.DataAnnotations;
 
+using Ant0nRocket.Lib.Dodb.DtoPayloads;
+
 namespace Ant0nRocket.Lib.Dodb.Tests.Dto.Payloads
 {
-    public class AnnotatedPayload
+    public class AnnotatedPayload : DtoPayloadBase
     {
         [Range(-5, 20)]
         public int SomeIntValue { get; set; }

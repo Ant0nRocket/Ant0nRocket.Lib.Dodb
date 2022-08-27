@@ -134,7 +134,7 @@ namespace Ant0nRocket.Lib.Dodb.Services
             var user = dbContext
                 .Users
                 .AsNoTracking()
-                .Where(u => u.Name == dtoPayload.Name)
+                .Where(u => u.Name == dtoPayload.Name.Trim())
                 .FirstOrDefault();
 
             if (user != default) // user exists
@@ -145,12 +145,20 @@ namespace Ant0nRocket.Lib.Dodb.Services
             else // user is new
             {
                 _logger.LogInformation($"User '{dtoPayload.Name}' created");
-                dbContext.Users.Add(dtoPayload);
+                dbContext.Users.Add(new User
+                {
+                    Id = dtoPayload.UserId,
+                    Name = dtoPayload.Name,
+                    PasswordHash = dtoPayload.PasswordHash,
+                    IsAdmin = dtoPayload.IsAdmin,
+                    IsHidden = dtoPayload.IsHidden,
+                    DateCreatedUtc = DateTime.UtcNow,
+                });
                 dbContext.SaveChanges();
                 return new GrCreateUser_Success();
             }
         }
 
-#endregion // Internal functions
+        #endregion // Internal functions
     }
 }

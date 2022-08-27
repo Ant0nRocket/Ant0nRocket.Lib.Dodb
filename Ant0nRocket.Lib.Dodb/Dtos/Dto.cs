@@ -1,5 +1,8 @@
 ﻿namespace Ant0nRocket.Lib.Dodb.Dtos
 {
+    /// <summary>
+    /// Base of a <see cref="DtoOf{T}"/>. Contains minimum required information.
+    /// </summary>
     public class Dto
     {
         /// <summary>
@@ -20,7 +23,7 @@
         /// <summary>
         /// Comment of document.
         /// </summary>
-        public string Description { get; set; } = default;
+        public string? Description { get; set; } = default;
 
         /// <summary>
         /// Date when the document was created.<br />

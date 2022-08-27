@@ -45,5 +45,15 @@ namespace Ant0nRocket.Lib.Dodb.Tests
                 _ => new GrDtoPayloadHandlerNotFound()
             };
         }
+
+        [Test]
+        public void T002_CheckCarrierFeatures()
+        {
+            var dto = new DtoOf<TestPayload>();
+
+            var pld = dto.Payload;
+
+            Assert.That(pld.GetCarrier() == dto);
+        }
     }
 }

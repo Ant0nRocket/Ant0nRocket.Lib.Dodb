@@ -1,17 +1,48 @@
-﻿namespace Ant0nRocket.Lib.Dodb.Entities
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace Ant0nRocket.Lib.Dodb.Entities
 {
+    /// <summary>
+    /// Key element of a library. Every operation that changes
+    /// a database is a <see cref="Document"/>. Inside of a Document
+    /// there are all the data required to reproduce changes that was made.<br />
+    /// Additionally, <see cref="Dodb.Gateway.DodbSyncService"/> can
+    /// export documents to disk and read them back later. This feature
+    /// allowes you to sync you data across as many devices as you may need.
+    /// </summary>
     public class Document : EntityBase
     {
+        /// <summary>
+        /// Id of a <see cref="Entities.User"/> that created this Document.
+        /// </summary>
         public Guid UserId { get; set; }
 
-        public User User { get; set; }
+        /// <summary>
+        /// Instance of the <see cref="Entities.User"/> that created this Document.
+        /// </summary>
+        public User? User { get; set; }
 
+        /// <summary>
+        /// Library automatically controls that every Document (except first one)
+        /// could be applyed only when required Document exists in database.<br />
+        /// Something like block-chain, but without encryption.
+        /// </summary>
         public Guid RequiredDocumentId { get; set; }
 
-        public string Payload { get; set; }
+        /// <summary>
+        /// A payload of a DTO, that created this document, serialized as JSON.
+        /// </summary>
+        [Required]
+        public string? Payload { get; set; }
 
-        public string PayloadType { get; set; }
+        /// <summary>
+        /// CLR-type of a payload of a DTO that created this document.
+        /// </summary>
+        public string? PayloadType { get; set; }
 
-        public string Description { get; set; }
+        /// <summary>
+        /// Comment from user.
+        /// </summary>
+        public string? Description { get; set; }
     }
 }

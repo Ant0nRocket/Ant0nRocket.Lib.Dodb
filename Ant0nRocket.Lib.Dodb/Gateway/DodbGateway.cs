@@ -165,8 +165,8 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
             if (_isAnyDocumentExist == false && dtoPayload is PldCreateUser p)
             {
-                dto.UserId = p.Id;
-                logger.LogWarning($"First document creates a user! It's OK!");
+                dto.UserId = p.UserId;
+                logger.LogWarning($"Created user will be an author of a document, 'cause it's a first document!");
             }
 
             var dtoHandleResponse = // first, try internal handler, and if not (it will return null) drop to registred
