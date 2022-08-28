@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <PackageProjectUrl>https://github.com/Ant0nRocket/Ant0nRocket.Lib.Dodb</PackageProjectUrl>
     <Copyright>Ant0nRocket</Copyright>
-    <Version>2.1.0</Version>
+    <Version>2.2.0.1</Version>
     <PackageLicenseExpression>Beerware</PackageLicenseExpression>
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
   </PropertyGroup>

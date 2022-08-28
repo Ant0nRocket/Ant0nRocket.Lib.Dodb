@@ -14,7 +14,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests.Services
         {
             if (context is TestDbContext ctx)
             {
-                ctx.Tests.Add(new Entities.Test { SomeContent = "Hello" });
+                ctx.Tests.Add(new Entities.Test { SomeContent = "Hello", DocumentRefId = dto.GetCarrier().Id });
                 return new GrOk();
             }
 

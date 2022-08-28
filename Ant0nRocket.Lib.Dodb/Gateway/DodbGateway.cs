@@ -265,23 +265,23 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             // ... and when transaction starter (or not :)) - push dto deeper.
             var pushResult = PushDtoObject(dto, dbContext);
 
+            // By default IsSuccess=true.
+            // Error responces marked with [IsSuccess(false)]
+            var isDtoHandledSuccessfully = AttributeUtils
+                .GetAttribute<IsSuccessAttribute>(pushResult.GetType())?.IsSuccess ?? true;
+
+            if (isDtoHandledSuccessfully == false)
+            {
+                logger.LogError($"Got {pushResult.GetType().Name} for DTO '{dto.Id}': {pushResult.AsJson()}");
+                return pushResult;
+            }
+
             if (externalDbContext == default)
             {
                 // What is going on here?
                 // Very simple! If 'externalDbContext' is null means that we have create our dbContext
                 // here (in this function). If so - we have a right (duty? :)) to save changes and
                 // dispose what we have done.
-
-                // By default IsSuccess=true.
-                // Error responces marked with [IsSuccess(false)]
-                var isDtoHandledSuccessfully = AttributeUtils
-                    .GetAttribute<IsSuccessAttribute>(pushResult.GetType())?.IsSuccess ?? true;
-
-                if (isDtoHandledSuccessfully == false)
-                {
-                    logger.LogError($"Got {pushResult.GetType().Name} for DTO '{dto.Id}': {pushResult.AsJson()}");
-                    return pushResult;
-                }
 
                 try
                 {
@@ -366,6 +366,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             dto.Payload.Value.PasswordHash = GetPasswordHashHandler().Invoke("root");
             dto.Payload.Value.IsAdmin = true;
             dto.Payload.Value.IsHidden = true;
+            dto.Payload.Value.DocumentRefId = dto.Id;
 
             using var transaction = dbContext.Database.BeginTransaction();
 

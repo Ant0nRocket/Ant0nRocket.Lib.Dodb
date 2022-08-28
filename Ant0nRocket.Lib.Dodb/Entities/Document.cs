@@ -19,7 +19,7 @@ namespace Ant0nRocket.Lib.Dodb.Entities
         /// Id of a Document.
         /// </summary>
         [Key]
-        public Guid Id { get; set; } = Guid.NewGuid();
+        public Guid Id { get; set; }
 
         /// <summary>
         /// Id of a <see cref="Entities.User"/> that created this Document.

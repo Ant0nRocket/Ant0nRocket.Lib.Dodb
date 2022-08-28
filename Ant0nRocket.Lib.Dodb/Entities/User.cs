@@ -6,13 +6,8 @@ namespace Ant0nRocket.Lib.Dodb.Entities
     /// Basic user implementation. If you need more advanced logic - 
     /// fill free to inherit this class in your namespace.
     /// </summary>
-    public class User
+    public class User : EntityBase
     {
-        /// <summary>
-        /// Id of a user.
-        /// </summary>
-        public Guid Id { get; set; } = Guid.NewGuid();
-
         /// <summary>
         /// User name (try not pass here any novels :)
         /// </summary>
