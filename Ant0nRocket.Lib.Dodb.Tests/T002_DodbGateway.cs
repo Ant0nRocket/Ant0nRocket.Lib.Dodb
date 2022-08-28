@@ -24,17 +24,17 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         [Test]
         public void T000_AuthAsRoot()
         {
-            T001_DodbUsersServiceTests.AuthUser("root", "root", out rootUser);
+            T001_DodbUsersServiceTests.AuthUser("__root", "root", out rootUser);
             Assert.That(rootUser is not null);
         }
 
         [Test]
         public void T001_SendingUnHandledDtoType()
         {
-            var dto = new DtoOf<NotHandledPayload>() { Id = Guid.NewGuid(), UserId = Guid.NewGuid() };
+            var dto = new DtoOf<NotHandledPayload>() { UserId = Guid.NewGuid() };
             var result = DodbGateway.PushDto(dto);
             Assert.That(result, Is.Not.Null);
-            Assert.That(result is GrDtoPayloadHandlerNotFound);
+            Assert.That(result is GrDtoFromUnknownUser);
         }
 
         [Test]
@@ -87,64 +87,25 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         [Test]
         public void T004_SendValidDto()
         {
-            var dto = new DtoOf<AnnotatedPayload>()
-            {
-                UserId = rootUser.Id,
-                Payload = new()
-                {
-                    SomeIntValue = 0,
-                    SomeStringValue = "Anton"
-                }
-            };
+            var dto = DodbGateway.CreateDto<AnnotatedPayload>(userId: rootUser?.Id ?? default);
+            dto.Payload.SomeIntValue = 36;
+            dto.Payload.SomeStringValue = "Anton";
 
             var result = DodbGateway.PushDto(dto);
-
-            Assert.That(result, Is.Not.Null);
             Assert.That(result is GrOk);
-        }
 
-        [Test]
-        public void T005_SendAnotherValidDto()
-        {
-            var dto = new DtoOf<AnnotatedPayload>()
-            {
-                UserId = rootUser.Id,
-                Payload = new()
-                {
-                    SomeIntValue = 19,
-                    SomeStringValue = "Olga"
-                }
-            };
+            dto = DodbGateway.CreateDto<AnnotatedPayload>(userId: rootUser?.Id ?? default);
+            dto.Payload.SomeIntValue = 35;
+            dto.Payload.SomeStringValue = "Olga";
 
-            var result = DodbGateway.PushDto(dto);
-
-            Assert.That(result, Is.Not.Null);
-            Assert.That(result is GrOk);
-        }
-
-        [Test]
-        public void T006_CheckValidationDisableFlag()
-        {
-            var dto = new DtoOf<AnnotatedPayload>()
-            {
-                UserId = rootUser.Id,
-                Payload = new()
-                {
-                    SomeIntValue = 15,
-                    SomeStringValue = "SomeO"
-                }
-            };
-
-            var result = DodbGateway.PushDto(dto);
-
-            Assert.That(result, Is.Not.Null);
+            result = DodbGateway.PushDto(dto);
             Assert.That(result is GrOk);
         }
 
         [Test]
         public void T007_ValidationOfLists()
         {
-            var dto = new DtoOf<ListPayload>() { UserId = rootUser.Id };
+            var dto = DodbGateway.CreateDto<ListPayload>(userId: rootUser?.Id ?? default);
             var pushResult = DodbGateway.PushDto(dto);
             Assert.That(pushResult is GrDtoIsInvalid); // no items added
 
@@ -172,11 +133,11 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         {
             var syncDirectory = Path.Combine(FileSystemUtils.GetDefaultAppDataFolderPath(), "Sync");
             FileSystemUtils.ScanDirectoryRecursively(syncDirectory, f => File.Delete(f)); // clean up
-            DodbSyncService.SyncDocuments(syncDirectory); // should create 5 files
+            DodbSyncService.SyncDocuments(syncDirectory); // should create 4 files
 
             var filesList = new List<string>();
             FileSystemUtils.ScanDirectoryRecursively(syncDirectory, f => filesList.Add(f));
-            Assert.AreEqual(5, filesList.Count);
+            Assert.AreEqual(4, filesList.Count);
         }
 
         [Test]
@@ -186,7 +147,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
             var syncDirectory = Path.Combine(FileSystemUtils.GetDefaultAppDataFolderPath(), "Sync");
             var filesList = new List<string>();
             FileSystemUtils.ScanDirectoryRecursively(syncDirectory, f => filesList.Add(f));
-            Assert.AreEqual(5, filesList.Count);
+            Assert.AreEqual(4, filesList.Count);
 
             using var dbContext = new TestDbContext();
             dbContext.Documents.RemoveRange(dbContext.Documents);
@@ -196,7 +157,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
 
             DodbSyncService.SyncDocuments(syncDirectory);
 
-            Assert.AreEqual(5, dbContext.Documents.Count());
+            Assert.AreEqual(4, dbContext.Documents.Count());
         }
 
         [Test]

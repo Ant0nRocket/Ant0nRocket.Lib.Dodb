@@ -2,8 +2,10 @@
 
 namespace Ant0nRocket.Lib.Dodb.Tests.Entities
 {
-    public class Test : EntityBase
+    public class Test
     {
+        public int Id { get; set; }
+
         public string SomeContent { get; set; } = "Hello";
     }
 }

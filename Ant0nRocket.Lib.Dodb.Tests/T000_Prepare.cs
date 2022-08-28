@@ -27,9 +27,9 @@ namespace Ant0nRocket.Lib.Dodb.Tests
             BasicLogWritter.LogFileNamePrefix = "DodbGateway.Tests_";
             Logger.LogToBasicLogWritter = true;
 
-            DodbGateway.RegisterDbContextGetterFunc(new Func<IDodbContext>(() => new TestDbContext()));
-            DodbGateway.RegisterKnownPayloadTypes();
-            DodbGateway.RegisterDtoPayloadHandler(DtoHandlerMethod);
+            DodbGateway.Initialize(
+                getDbContextHandler: () => new TestDbContext(),
+                dtoPayloadHandler: DtoHandlerMethod);
         }
 
         private GatewayResponse DtoHandlerMethod(object dtoPayloadObject, IDodbContext dbContext)

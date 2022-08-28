@@ -17,8 +17,9 @@ namespace Ant0nRocket.Lib.Dodb.Services
         /// Checks any document (default <paramref name="documentId"/>) or
         /// specified by <paramref name="documentId"/> exists.
         /// </summary>
-        public static bool CheckDocumentExist(Guid documentId = default)
+        public static bool CheckDocumentExist(Guid? documentId = default)
         {
+            documentId ??= Guid.Empty; // forbid search nulls
             using var dbContext = DodbGateway.GetDbContext();
             var query = dbContext?.Documents.AsNoTracking();
 
