@@ -6,6 +6,6 @@ namespace Ant0nRocket.Lib.Dodb.Gateway.Responses
     [IsSuccess(false)]
     public class GrDtoFromUnknownUser : GatewayResponse
     {
-        public Guid UserId { get; init; }
+        public Guid? UserId { get; init; }
     }
 }

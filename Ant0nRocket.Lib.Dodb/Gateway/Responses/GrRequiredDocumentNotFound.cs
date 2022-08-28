@@ -8,9 +8,6 @@ namespace Ant0nRocket.Lib.Dodb.Gateway.Responses
     {
         public Guid RequesterId { get; init; }
 
-        public Guid RequiredDocumentId { get; init; }
-
-        public override string ToString() =>
-            $"DTO '{RequesterId}' requires a document '{RequiredDocumentId}' which is not found";
+        public Guid? RequiredDocumentId { get; init; }
     }
 }

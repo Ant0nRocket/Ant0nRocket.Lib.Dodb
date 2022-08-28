@@ -13,12 +13,12 @@
         /// <summary>
         /// Id of a <see cref="Entities.User"/> that created this DTO
         /// </summary>
-        public Guid UserId { get; set; } = Guid.Empty;
+        public Guid? UserId { get; set; } = default;
 
         /// <summary>
         /// Requires specified document to exists in database.
         /// </summary>
-        public Guid RequiredDocumentId { get; set; } = Guid.Empty;
+        public Guid? RequiredDocumentId { get; set; } = default;
 
         /// <summary>
         /// Comment of document.
@@ -26,9 +26,8 @@
         public string? Description { get; set; } = default;
 
         /// <summary>
-        /// Date when the document was created.<br />
-        /// Library will assign it automatically.
+        /// Date when the document was created.
         /// </summary>
-        public DateTime DateCreatedUtc { get; set; } = DateTime.MinValue;
+        public DateTime DateCreatedUtc { get; set; } = DateTime.UtcNow;
     }
 }

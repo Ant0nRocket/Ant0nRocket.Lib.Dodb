@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 using Newtonsoft.Json;
 
@@ -12,12 +13,18 @@ namespace Ant0nRocket.Lib.Dodb.Entities
     /// export documents to disk and read them back later. This feature
     /// allowes you to sync you data across as many devices as you may need.
     /// </summary>
-    public class Document : EntityBase
+    public class Document
     {
+        /// <summary>
+        /// Id of a Document.
+        /// </summary>
+        [Key]
+        public Guid Id { get; set; } = Guid.NewGuid();
+
         /// <summary>
         /// Id of a <see cref="Entities.User"/> that created this Document.
         /// </summary>
-        public Guid UserId { get; set; }
+        public Guid? UserId { get; set; }
 
         /// <summary>
         /// Instance of the <see cref="Entities.User"/> that created this Document.
@@ -30,7 +37,11 @@ namespace Ant0nRocket.Lib.Dodb.Entities
         /// could be applyed only when required Document exists in database.<br />
         /// Something like block-chain, but without encryption.
         /// </summary>
-        public Guid RequiredDocumentId { get; set; }
+        public Guid? RequiredDocumentId { get; set; }
+
+        /// <inheritdoc cref="RequiredDocumentId"/>
+        [JsonIgnore]
+        public Document? RequiredDocument { get; set; }
 
         /// <summary>
         /// A payload of a DTO, that created this document, serialized as JSON.
@@ -50,5 +61,11 @@ namespace Ant0nRocket.Lib.Dodb.Entities
         /// Comment from user.
         /// </summary>
         public string? Description { get; set; }
+
+        /// <summary>
+        /// Timestamp (UTC).
+        /// </summary>
+        [Required]
+        public DateTime DateCreatedUtc { get; set; }
     }
 }

@@ -35,7 +35,7 @@ namespace Ant0nRocket.Lib.Dodb.Dtos
         /// <summary>
         /// Default constructor.
         /// </summary>
-        public DtoOf(Guid userId = default, Guid requiredDocumentId = default)
+        public DtoOf(Guid? userId = default, Guid? requiredDocumentId = default)
         {
             if (typeof(T) == typeof(object))
                 // Sync service can use T = object and it will

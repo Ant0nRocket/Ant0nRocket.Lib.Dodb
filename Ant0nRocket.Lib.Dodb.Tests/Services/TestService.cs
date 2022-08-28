@@ -1,5 +1,6 @@
 ﻿using Ant0nRocket.Lib.Dodb.Abstractions;
 using Ant0nRocket.Lib.Dodb.Gateway.Responses;
+using Ant0nRocket.Lib.Dodb.Tests.Contexts;
 using Ant0nRocket.Lib.Dodb.Tests.Dto.Payloads;
 using Ant0nRocket.Lib.Std20.Logging;
 
@@ -11,8 +12,13 @@ namespace Ant0nRocket.Lib.Dodb.Tests.Services
 
         public static GatewayResponse TestMethod(TestPayload dto, IDodbContext context)
         {
-            logger.LogDebug($"some work with TestPayload DTO");
-            return new GrOk();
+            if (context is TestDbContext ctx)
+            {
+                ctx.Tests.Add(new Entities.Test { SomeContent = "Hello" });
+                return new GrOk();
+            }
+
+            return new GrPushDtoFailed { Message = "Not a TestDbContext passed" };
         }
 
         public static GatewayResponse AnnotatedPayloadMethod(AnnotatedPayload dto, IDodbContext context)

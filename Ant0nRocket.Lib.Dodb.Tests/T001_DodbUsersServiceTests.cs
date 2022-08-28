@@ -22,29 +22,27 @@ namespace Ant0nRocket.Lib.Dodb.Tests
             string userName,
             string plainPassword,
             bool isAdmin = false,
-            bool isHidden = false,
-            bool sameUserIdInDtoAndPayload = false)
+            bool isHidden = false)
         {
-            var dto = new DtoOf<PldCreateUser>();
+            var dto = DodbGateway.CreateDto<PldCreateUser>();
             dto.UserId = documentAuthorId;
             dto.Payload.Value.Name = userName;
             dto.Payload.Value.PasswordHash = DodbUsersService.CalcPasswordHash(plainPassword);
             dto.Payload.Value.IsAdmin = isAdmin;
             dto.Payload.Value.IsHidden = isHidden;
 
-            if (sameUserIdInDtoAndPayload)
-                dto.UserId = dto.Payload.Value.Id;
-
             return DodbGateway.PushDto(dto);
         }
 
-        public static void AuthUser(string userName, string plainPassword, out User? result)
+        public static GatewayResponse AuthUser(string userName, string plainPassword, out User? result)
         {
             var authResult = DodbUsersService.Auth(userName, plainPassword);
             if (authResult is GrAuth_Success sResult)
                 result = sResult.AuthenticatedUser;
             else
                 result = default;
+
+            return authResult;
         }
 
         [Test]
@@ -52,9 +50,8 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         {
             LogStart();
 
-            var createResult = CreateUser(default, "root", "root", isAdmin: true, isHidden: true, sameUserIdInDtoAndPayload: true);
-            Assert.That(createResult is GrCreateUser_Success);
-            AuthUser("root", "root", out rootUser);
+            var authResult = AuthUser("__root", "root", out rootUser);
+            Assert.That(authResult is GrAuth_Success);
             Assert.That(rootUser is not null);
 
             LogEnd();
@@ -70,7 +67,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         [Test]
         public void T004_TryCreateExistingUser()
         {
-            var createResult = CreateUser(rootUser?.Id ?? default, "root", "root");
+            var createResult = CreateUser(rootUser?.Id ?? default, "__root", "root");
             Assert.That(createResult is GrCreateUser_Exists);
         }
 

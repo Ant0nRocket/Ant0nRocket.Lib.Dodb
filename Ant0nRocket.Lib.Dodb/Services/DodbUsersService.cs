@@ -3,8 +3,6 @@ using Ant0nRocket.Lib.Dodb.DtoPayloads;
 using Ant0nRocket.Lib.Dodb.Entities;
 using Ant0nRocket.Lib.Dodb.Gateway;
 using Ant0nRocket.Lib.Dodb.Services.Responces.DodbUsersService;
-using Ant0nRocket.Lib.Std20.Cryptography;
-using Ant0nRocket.Lib.Std20.Extensions;
 using Ant0nRocket.Lib.Std20.Logging;
 
 using Microsoft.EntityFrameworkCore;
@@ -18,31 +16,15 @@ namespace Ant0nRocket.Lib.Dodb.Services
     {
         private static readonly Logger _logger = Logger.Create(nameof(DodbUsersService));
 
-        private static Func<string, string> _passwordHasherFunc = null;
 
         #region Public functions
 
         /// <summary>
-        /// Performs registration of external hashing function. Usefull when you need
-        /// to add some salt to password, etc.
-        /// </summary>
-        public static void RegisterPasswordHasherFunc(Func<string, string> func) =>
-            _passwordHasherFunc = func;
-
-        /// <summary>
-        /// Calculates hash of a <paramref name="password"/>.<br />
-        /// By default it's a simple SHA-256 hash, but you register your
-        /// own password hasher with <see cref="RegisterPasswordHasherFunc(Func{string, string})"/>.
+        /// Calculates hash of a <paramref name="password"/>.
         /// </summary>
         public static string CalcPasswordHash(string password)
         {
-            if (_passwordHasherFunc == null)
-            {
-                _logger.LogDebug("Hashing password using internal hash function");
-                return Hasher.ComputeHash(password).ToHexString();
-            }
-
-            _logger.LogDebug("Hashing password using external hash function");
+            var _passwordHasherFunc = DodbGateway.GetPasswordHashHandler();
             return _passwordHasherFunc(password);
         }
 
@@ -146,7 +128,6 @@ namespace Ant0nRocket.Lib.Dodb.Services
             {
                 _logger.LogInformation($"User '{dtoPayload.Value.Name}' created");
                 dbContext.Users.Add(dtoPayload.Value);
-                dbContext.SaveChanges();
                 return new GrCreateUser_Success();
             }
         }
