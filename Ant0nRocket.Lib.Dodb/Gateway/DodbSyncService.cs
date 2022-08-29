@@ -136,9 +136,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
         /// </summary>
         private static Dictionary<Guid, string> GetExportedDocumentsIdAndPathDict(string syncDocumentsDirectoryPath)
         {
-            const string FILENAME_PATTERN =
-                @"(?<Year>\d{4})(?<Month>\d{2})(?<Day>\d{2})_" +
-                @"(?<Hours>\d{2})(?<Minutes>\d{2})(?<Seconds>\d{2})(?<MilliSeconds>\d+)_" +
+            const string FILENAME_PATTERN = @"(?<Tickes>\d{18,})_(?<Type>[A-Za-z]+)_" +
                 @"(?<DocumentId>[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})";
 
             var foundDocumentsIdAndPath = new Dictionary<Guid, string>();
@@ -212,7 +210,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                     return;
                 }
 
-                var shortFileName = $"{document.DateCreatedUtc:yyyyMMdd}_{document.DateCreatedUtc:HHmmssfffffff}_{document.Id}.json";
+                var shortFileName = $"{document.DateCreatedUtc.Ticks}_{document.PayloadType!.TypeName.FromLatest('.')}_{document.Id}.json";
                 var resultPath = Path.Combine(syncDocumentsDirectoryWithSubFolderPath, shortFileName);
 
                 File.WriteAllText(resultPath, documentJsonValue);
@@ -278,7 +276,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             var knownPluginsTypes = ReflectionUtils.GetClassesThatImplementsInterface<IDodbSyncServicePlugin>();
             foreach (var pluginType in knownPluginsTypes)
             {
-                var pluginInstance = (IDodbSyncServicePlugin)Activator.CreateInstance(pluginType);
+                var pluginInstance = (IDodbSyncServicePlugin)Activator.CreateInstance(pluginType)!;
                 logger.LogInformation($"Found plugin '{pluginInstance.Name}'. Ready state: {pluginInstance.IsReady}.");
 
                 try
