@@ -1,6 +1,8 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
+using Newtonsoft.Json;
+
 namespace Ant0nRocket.Lib.Dodb.Entities
 {
     /// <summary>
@@ -19,10 +21,11 @@ namespace Ant0nRocket.Lib.Dodb.Entities
         /// </summary>
         [ForeignKey("Document")]
         public Guid DocumentRefId { get; set; }
-        
+
         /// <summary>
         /// Document that created entity/record.
         /// </summary>
+        [JsonIgnore]
         public Document? Document { get; set; }
     }
 }
