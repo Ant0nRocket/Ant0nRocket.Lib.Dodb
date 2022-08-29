@@ -20,6 +20,9 @@ namespace Ant0nRocket.Lib.Dodb.Entities
         [ForeignKey("Document")]
         public Guid DocumentRefId { get; set; }
         
-        public Document Document { get; set; }
+        /// <summary>
+        /// Document that created entity/record.
+        /// </summary>
+        public Document? Document { get; set; }
     }
 }

@@ -127,6 +127,7 @@ namespace Ant0nRocket.Lib.Dodb.Services
             else // user is new
             {
                 _logger.LogInformation($"User '{dtoPayload.Value.Name}' created");
+                dtoPayload.Value.DocumentRefId = dtoPayload.GetCarrier().Id;
                 dbContext.Users.Add(dtoPayload.Value);
                 return new GrCreateUser_Success();
             }
