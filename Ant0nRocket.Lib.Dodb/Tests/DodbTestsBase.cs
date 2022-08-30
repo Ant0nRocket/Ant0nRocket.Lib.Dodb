@@ -12,7 +12,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
     /// </summary>
     public abstract class DodbTestsBase
     {
-        protected DodbTestsBase()
+        public DodbTestsBase()
         {
             Initialize();
         }
@@ -25,7 +25,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
 
             // Configuring required settings...
             Logger.LogToBasicLogWritter = true;
-            BasicLogWritter.LogFileNamePrefix = "EkChuaj.Tests_";
+            BasicLogWritter.LogFileNamePrefix = "DodbGateway.Tests_";
             _ = FileSystemUtils.Delete(BasicLogWritter.LogDirectory);
 
             Logger.Log($"{nameof(Logger.LogToBasicLogWritter)} set to {Logger.LogToBasicLogWritter}");

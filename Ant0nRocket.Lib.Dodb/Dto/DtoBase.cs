@@ -11,7 +11,7 @@
         public Guid Id { get; set; } = Guid.NewGuid();
 
         /// <summary>
-        /// Id of a <see cref="Tests.Model.User"/> that created this DTO
+        /// Id of a User that created this DTO
         /// </summary>
         public Guid? UserId { get; set; } = default;
 

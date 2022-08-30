@@ -6,7 +6,7 @@ using NUnit.Framework;
 
 namespace Ant0nRocket.Lib.Dodb.Tests
 {
-    internal class T001_DodbUsersService : DodbTestsBase
+    internal class T002_DodbUsersService : DodbTestsBase
     {
 
         [Test]
