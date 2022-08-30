@@ -1,20 +1,27 @@
-﻿using Ant0nRocket.Lib.Dodb.Abstractions;
-using Ant0nRocket.Lib.Dodb.Entities;
+﻿using Ant0nRocket.Lib.Dodb.Models;
 
 using Microsoft.EntityFrameworkCore;
 
 namespace Ant0nRocket.Lib.Dodb.DbContexts
 {
-    public abstract class DodbContextBase : DbContext, IDodbContext
+    /// <summary>
+    /// Base DbContext for Dodb database.
+    /// </summary>
+    public abstract class DodbContextBase : DbContext
     {
-        public virtual DbSet<Document> Documents { get; set; }
-        public virtual DbSet<PayloadType> PayloadTypes { get; set;}
-        public virtual DbSet<User> Users { get; set;}
+        /// <summary>
+        /// All documents that were applied.
+        /// </summary>
+        public DbSet<Document> Documents { get; set; }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// All known payload types of AppDomain.
+        /// </summary>
+        public DbSet<PayloadType> PayloadTypes { get; set;}
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            //modelBuilder.Entity<User>().HasOne(u => u.RecordCreator).WithOne(d => d.User).HasForeignKey("Document.Id");
+            modelBuilder.Entity<PayloadType>().HasIndex(p => p.TypeName).IsUnique();
         }
     }
 }

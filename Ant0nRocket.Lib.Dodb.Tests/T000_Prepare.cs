@@ -1,24 +1,22 @@
-﻿using System;
-
-using Ant0nRocket.Lib.Dodb.Abstractions;
-using Ant0nRocket.Lib.Dodb.DtoPayloads;
-using Ant0nRocket.Lib.Dodb.Dtos;
+﻿using Ant0nRocket.Lib.Dodb.DbContexts;
+using Ant0nRocket.Lib.Dodb.Dto;
 using Ant0nRocket.Lib.Dodb.Gateway;
+using Ant0nRocket.Lib.Dodb.Gateway.Abstractions;
 using Ant0nRocket.Lib.Dodb.Gateway.Responses;
 using Ant0nRocket.Lib.Dodb.Tests.Contexts;
 using Ant0nRocket.Lib.Dodb.Tests.Dto.Payloads;
-using Ant0nRocket.Lib.Dodb.Tests.Entities;
+using Ant0nRocket.Lib.Dodb.Tests.Dto.Payloads.Mock;
 using Ant0nRocket.Lib.Dodb.Tests.Services;
+using Ant0nRocket.Lib.Dodb.Tests.Services.Responces.Mock;
 using Ant0nRocket.Lib.Std20;
 using Ant0nRocket.Lib.Std20.Logging;
-using Ant0nRocket.Lib.Std20.Testing;
 
 using NUnit.Framework;
 
 namespace Ant0nRocket.Lib.Dodb.Tests
 {
 
-    public class T000_Prepare : TestBase
+    public class T000_Prepare : DodbTestsBase
     {
         [Test]
         public void T001_RegisterGetterAndHandlers()
@@ -32,21 +30,21 @@ namespace Ant0nRocket.Lib.Dodb.Tests
                 dtoPayloadHandler: DtoHandlerMethod);
         }
 
-        private GatewayResponse DtoHandlerMethod(object dtoPayloadObject, IDodbContext dbContext)
+        private IGatewayResponse DtoHandlerMethod(object dtoPayloadObject, DodbContextBase dbContext)
         {
             return dtoPayloadObject switch
             {
-                TestPayload dtoPayload => TestService.TestMethod(dtoPayload, dbContext),
+                PldCreateUser p => UsersService.CreateUser(p, dbContext),
                 AnnotatedPayload => new GrOk(),
                 ListPayload => new GrOk(),
-                _ => new GrDtoPayloadHandlerNotFound()
+                _ => new GrDtoPayloadHandlerNotFound { DtoPayloadTypeName = $"{dtoPayloadObject.GetType()}" }
             };
         }
 
         [Test]
         public void T002_CheckCarrierFeatures()
         {
-            var dto = new DtoOf<TestPayload>();
+            var dto = new DtoOf<PldCreateUser>();
 
             var pld = dto.Payload;
 

@@ -4,8 +4,8 @@ using Ant0nRocket.Lib.Dodb.Gateway.Responses.Attributes;
 namespace Ant0nRocket.Lib.Dodb.Gateway.Responses
 {
     [IsSuccess(false)]
-    public class GrDtoFromUnknownUser : IGatewayResponse
+    public class GrDtoPushFailed : IGatewayResponse
     {
-        public Guid? UserId { get; init; }
+        public string Message { get; set; }
     }
 }

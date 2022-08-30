@@ -1,15 +1,17 @@
-﻿using Ant0nRocket.Lib.Dodb.Abstractions;
-using Ant0nRocket.Lib.Dodb.Attributes;
+﻿using System.Text.RegularExpressions;
+
 using Ant0nRocket.Lib.Dodb.DbContexts;
-using Ant0nRocket.Lib.Dodb.DtoPayloads;
-using Ant0nRocket.Lib.Dodb.Dtos;
-using Ant0nRocket.Lib.Dodb.Entities;
+using Ant0nRocket.Lib.Dodb.Dto;
+using Ant0nRocket.Lib.Dodb.Dto.Payloads.Abstractions;
+using Ant0nRocket.Lib.Dodb.Extensions;
+using Ant0nRocket.Lib.Dodb.Gateway.Abstractions;
 using Ant0nRocket.Lib.Dodb.Gateway.Helpers;
 using Ant0nRocket.Lib.Dodb.Gateway.Responses;
-using Ant0nRocket.Lib.Dodb.Services;
-using Ant0nRocket.Lib.Dodb.Services.Responces.DodbUsersService;
+using Ant0nRocket.Lib.Dodb.Gateway.Responses.Attributes;
+using Ant0nRocket.Lib.Dodb.Models;
 using Ant0nRocket.Lib.Std20.Cryptography;
 using Ant0nRocket.Lib.Std20.Extensions;
+using Ant0nRocket.Lib.Std20.IO;
 using Ant0nRocket.Lib.Std20.Logging;
 using Ant0nRocket.Lib.Std20.Reflection;
 
@@ -53,7 +55,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
         /*
          Why we need a DbContext getter?
-         This class doesn't know about the final class you will work with but it has to be IDodbContext.
+         This class doesn't know about the final class you will work with but it has to be DodbContextBase.
          As you DbContext will be somewhere in external library we need to know how to get it.
          */
 
@@ -118,25 +120,22 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
             // Important to set this flag here! TouchUser will throw if false.
             _isInitialized = true;
-
-            TouchRootUser();
         }
 
         #endregion
 
         #region DTO handling
 
-        private static GatewayResponse? TryHandleDtoPayloadInternally(object dtoPayload, IDodbContext dbContext)
+        private static IGatewayResponse? TryHandleDtoPayloadInternally(object dtoPayload, DodbContextBase dbContext)
         {
             var c = dbContext;
             return dtoPayload switch
             {
-                PldCreateUser p => DodbUsersService.CreateUser(p, c),
                 _ => null
             };
         }
 
-        private static GatewayResponse? TryHandleDtoPayloadExternally(object dtoPayload, IDodbContext dbContext)
+        private static IGatewayResponse? TryHandleDtoPayloadExternally(object dtoPayload, DodbContextBase dbContext)
         {
             if (_dtoPayloadHandler != null)
                 return _dtoPayloadHandler(dtoPayload, dbContext);
@@ -147,7 +146,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
         /// Function only tryes to apply <paramref name="dto"/> inside <paramref name="dbContext"/>.<br />
         /// It doesn't check trnsactions, doesn't valid, only handling!
         /// </summary>
-        private static GatewayResponse PushDtoObject(Dto dto, IDodbContext dbContext)
+        private static IGatewayResponse PushDtoObject(DtoBase dto, DodbContextBase dbContext)
         {
             var dtoType = dto.GetType();
             var dtoPayloadPropertyInfo = dtoType.GetProperties().FirstOrDefault(p => p.Name == "Payload") ??
@@ -166,33 +165,32 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                 UserId = dto.UserId,
                 RequiredDocumentId = dto.RequiredDocumentId,
                 DateCreatedUtc = dto.DateCreatedUtc,
-                Description = dto.Description,
                 PayloadTypeId = GetPayloadTypeId(dtoPayload),
                 PayloadJson = dtoPayload.AsJson()
             };
 
             dbContext.Documents.Add(document);
-
-            logger.LogInformation($"[uncommited] DTO '{dto.Id}' applied");
-
             return dtoHandleResponse;
         }
 
         /// <summary>
         /// 1. Throws <see cref="ApplicationException"/> if library wasn't initialized (see <see cref="Initialize(GetDbContextHandler, DtoPayloadHandler, Gateway.GetPasswordHashHandler?)"/>.<br />
-        /// 2. Returnes <see cref="GrDtoIsInvalid"/> if there are some validation errors in DTO or its payload.<br />
-        /// 3. Returnes <see cref="GrDtoFromUnknownUser"/> if no user found by <see cref="Dto.UserId"/>.<br />
-        /// 4. Returnes <see cref="GrDocumentExists"/> if any document with <paramref name="dto"/>.Id already exists.<br />
-        /// 5. Returnes <see cref="GrRequiredDocumentNotFound"/> if there is some document required to exist but not found.<br />
+        /// 2. Returnes <see cref="GrDtoValidationFailed"/> if there are some validation errors in DTO or its payload.<br />
+        /// 4. Returnes <see cref="GrDtoDocumentExists"/> if any document with <paramref name="dto"/>.Id already exists.<br />
+        /// 5. Returnes <see cref="GrDtoRequiredDocumentNotFound"/> if there is some document required to exist but not found.<br />
         /// 6. Returnes <see cref="GrDtoPayloadHandlerNotFound"/> if there is no handler found for payload.<br />
-        /// 7. Returnes <see cref="GrPushDtoFailed"/> if there some errors durring commit.<br />
+        /// 7. Returnes <see cref="GrDtoPushFailed"/> if there some errors durring commit.<br />
         /// <br />
-        /// Othervise returnes some <see cref="GatewayResponse"/><br />
+        /// Othervise returnes some <see cref="IGatewayResponse"/><br />
         /// ------------------------<br />
         /// If <paramref name="externalDbContext"/> passed then all transaction control, saving, disposing - is not 
         /// a business of current function. If you need just push DTO and commit it - dont set <paramref name="externalDbContext"/>!
         /// </summary>
-        public static GatewayResponse PushDto(Dto dto, DodbContextBase? externalDbContext = default)
+        public static IGatewayResponse PushDto(
+            DtoBase dto, 
+            DodbContextBase? externalDbContext = default,
+            Func<DtoBase, DodbContextBase, bool>? onDatabaseValidation = null,
+            Action<DtoBase, DodbContextBase>? beforeCommit = null)
         {
             if (!_isInitialized) throw new ApplicationException(ERROR_NOT_INITIALIZED);
 
@@ -202,7 +200,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             if (validator.ValidationResults.Count > 0)
             {
                 logger.LogError($"Invalid DTO '{dto.Id}': {string.Join(", ", validator.ErrorsList)}");
-                return new GrDtoIsInvalid(validator.ErrorsList);
+                return new GrDtoValidationFailed(validator.ErrorsList);
             }
 
             #endregion
@@ -211,30 +209,19 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             // It's time to create a DbContext here.
             var dbContext = externalDbContext ?? GetDbContext(); // COULD BE EXTERNAL !!!
 
-            #region Database validations (will check UserId, RequiredDocumentId exists)
+            using var transaction = externalDbContext == default ?
+                dbContext.Database.BeginTransaction() : // our context - our transaction
+                null; // external context - no transactions required!
 
-            if (dto.UserId == null)
-            {
-                if (dbContext.Documents.Any())
-                {
-                    var message = $"Invalid DTO received: UserId not specified";
-                    logger.LogError(message);
-                    return new GrDtoIsInvalid(message);
-                }
-            }
-            else // something is set in UserId
-            {
-                if (dbContext.Users.Any(u => u.Id == dto.UserId) == false)
-                {
-                    logger.LogWarning($"DTO from unknown user '{dto.UserId}' received");
-                    return new GrDtoFromUnknownUser { UserId = dto.UserId };
-                }
-            }
+            if (transaction != default)
+                logger.LogDebug($"Transaction '{transaction.TransactionId}' started...");
+
+            #region Database validations
 
             if (dbContext.Documents.Any(d => d.Id == dto.Id))
             {
                 logger.LogWarning($"Can't apply DTO '{dto.Id}': document with this Id already exists");
-                return new GrDocumentExists { DocumentId = dto.Id };
+                return new GrDtoDocumentExists { DocumentId = dto.Id };
             }
 
             if (dto.RequiredDocumentId != null)
@@ -242,7 +229,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                 if (!dbContext.Documents.Any(d => d.Id == dto.RequiredDocumentId))
                 {
                     logger.LogWarning($"Can't apply DTO '{dto.Id}': required document '{dto.RequiredDocumentId}' doesn't exists");
-                    return new GrRequiredDocumentNotFound { RequesterId = dto.Id, RequiredDocumentId = dto.RequiredDocumentId };
+                    return new GrDtoRequiredDocumentNotFound { RequesterId = dto.Id, RequiredDocumentId = dto.RequiredDocumentId };
                 }
             }
             else // RequiredDocumentId is NOT specified
@@ -251,30 +238,36 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                 // So, if any document exists there should not be a DTO without RequiredDocumentId
                 if (dbContext.Documents.Any())
                 {
-                    logger.LogError($"DTO '{dto.Id}' must have RequiredDocumentId");
-                    return new GrRequiredDocumentNotSpecified { DtoId = dto.Id };
+                    var message = $"DTO '{dto.Id}' must have RequiredDocumentId";
+                    logger.LogError(message);
+                    return new GrDtoPushFailed { Message = message };
                 }
+            }
+
+            var externalValidationResult = onDatabaseValidation?.Invoke(dto, dbContext) ?? true;
+            if (externalValidationResult == false)
+            {
+                var message = $"DTO '{dto.Id}' didn't pass database validation";
+                logger.LogError(message);
+                return new GrDtoValidationFailed(message);
             }
 
             #endregion
 
             // Alright! All checks done, DTO is ready to be applyied. But what about transaction?
             // If context is not external - let's start a transaction...
-            using var transaction = externalDbContext == default ? dbContext.Database.BeginTransaction() : null;
+            //using var transaction = externalDbContext == default ? dbContext.Database.BeginTransaction() : null;
 
             // ... and when transaction starter (or not :)) - push dto deeper.
             var pushResult = PushDtoObject(dto, dbContext);
 
-            // By default IsSuccess=true.
-            // Error responces marked with [IsSuccess(false)]
-            var isDtoHandledSuccessfully = AttributeUtils
-                .GetAttribute<IsSuccessAttribute>(pushResult.GetType())?.IsSuccess ?? true;
-
-            if (isDtoHandledSuccessfully == false)
+            if (pushResult.IsSuccess() == false)
             {
                 logger.LogError($"Got {pushResult.GetType().Name} for DTO '{dto.Id}': {pushResult.AsJson()}");
                 return pushResult;
             }
+
+            #region If this function created dbContext then we save and commit...
 
             if (externalDbContext == default)
             {
@@ -285,13 +278,15 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
                 try
                 {
+                    beforeCommit?.Invoke(dto, dbContext);
                     dbContext.SaveChanges();
                     transaction?.Commit();
+                    logger.LogDebug($"Transaction '{transaction?.TransactionId}' commited");
                 }
                 catch (Exception ex)
                 {
                     var message = $"{ex.Message} " + ex.InnerException?.Message ?? string.Empty;
-                    pushResult = new GrPushDtoFailed { Message = message };
+                    pushResult = new GrDtoPushFailed { Message = message };
                     logger.LogException(ex, $"Unable to proceed DTO '{dto.Id}'");
                 }
                 finally
@@ -302,6 +297,8 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                 // ... but If 'externalDbContext' is NOT null then we must not do anything else, let
                 // external owner of the context performs saving, disposing, etc.
             }
+
+            #endregion
 
             return pushResult;
         }
@@ -353,39 +350,6 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
         }
 
         /// <summary>
-        /// This function will work only one time - when database is empty.<br />
-        /// It will create first <see cref="Document"/> and <see cref="User"/> ("__root").
-        /// </summary>
-        private static void TouchRootUser()
-        {
-            using var dbContext = GetDbContext();
-            if (dbContext.Documents.Any()) return; // root user already touched.
-
-            var dto = CreateDto<PldCreateUser>();
-            dto.Payload.Value.Name = "__root";
-            dto.Payload.Value.PasswordHash = GetPasswordHashHandler().Invoke("root");
-            dto.Payload.Value.IsAdmin = true;
-            dto.Payload.Value.IsHidden = true;
-            dto.Payload.Value.DocumentRefId = dto.Id;
-
-            using var transaction = dbContext.Database.BeginTransaction();
-
-            var pushResult = PushDtoObject(dto, dbContext);
-            if (pushResult is not GrCreateUser_Success)
-            {
-                var message = $"Unable to create root user, got: {pushResult.AsJson()}";
-                logger.LogFatal(message);
-                throw new ApplicationException(message);
-            }
-
-#if DEBUG
-            logger.LogDebug($"{dbContext.ChangeTracker.DebugView.LongView}");
-#endif
-            dbContext.SaveChanges();
-            transaction.Commit(); // without try! Let it throw if needed.
-        }
-
-        /// <summary>
         /// Returnes DTO payload type Id.
         /// </summary>
         private static int GetPayloadTypeId(object dtoPayload)
@@ -408,8 +372,8 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
         /// <summary>
         /// Function will create a DTO container for <typeparamref name="T"/> with
-        /// filled <see cref="Dto.RequiredDocumentId"/>.<br />
-        /// If <paramref name="userId"/> specified - then <see cref="Dto.UserId"/> will be filled.
+        /// filled <see cref="DtoBase.RequiredDocumentId"/>.<br />
+        /// If <paramref name="userId"/> specified - then <see cref="DtoBase.UserId"/> will be filled.
         /// <b>N.B.!</b> Only <see cref="IPayload"/> classes valid for <typeparamref name="T"/>.
         /// </summary>
         public static DtoOf<T> CreateDto<T>(Guid? userId = default) where T : class, new()
@@ -430,6 +394,246 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
             return result;
         }
+
+
+
+        #region Sync documents
+
+        /// <summary>
+        /// Performes syncthronization of known Documents inside <paramref name="syncDocumentsDirectoryPath"/>.<br />
+        /// </summary>
+        public static void SyncDocuments(string syncDocumentsDirectoryPath)
+        {
+            if (syncDocumentsDirectoryPath == default)
+            {
+                const string ERROR_MESSAGE = "SyncDirectoryPath is not set";
+                logger.LogError(ERROR_MESSAGE);
+            }
+            else
+            {
+                FileSystemUtils.TouchDirectory(syncDocumentsDirectoryPath); // just to sure
+                PerformSyncDocumentsIteration(syncDocumentsDirectoryPath);
+            }
+        }
+
+        private static void PerformSyncDocumentsIteration(string syncDocumentsDirectoryPath)
+        {
+            var exportFromDate = ScanSyncDocumentsDirectoryMinExportDate(syncDocumentsDirectoryPath);
+            var knownDocumentIds = GetKnownDocumentIds(exportFromDate);
+            var exportedDocumentsIdAndPathDict = GetExportedDocumentsIdAndPathDict(syncDocumentsDirectoryPath);
+
+            var documentIdsToExportList = GetDocumentIdsToExportList(knownDocumentIds, exportedDocumentsIdAndPathDict);
+
+            var documentIdAndPathToImportDict = GetDocumentIdAndPathToImportDict(
+                knownDocumentIds,
+                exportedDocumentsIdAndPathDict);
+
+            ExportDocuments(documentIdsToExportList, syncDocumentsDirectoryPath);
+            ImportDocuments(documentIdAndPathToImportDict);
+        }
+
+        /// <summary>
+        /// Sync directory could contain archives (zip or 7z) in format 'yyyyMMdd.(zip|7z)'.<br />
+        /// This function will find them all and return latest covered date.<br />
+        /// <b>NB! Function will not open that archive! It's a user duty to pack archives with care!</b>
+        /// <br /><br />
+        /// Assume, that we have folder structure like this:<br />
+        /// - 20220719.zip<br />
+        /// - 20220829.7z<br />
+        /// - ... (documents)<br /><br />
+        /// Library will decide that all documents from the begining of time till 29th Aug 2022 are
+        /// packed inside archives and will skip documents with less DateCreatedUtc then found date.
+        /// </summary>
+        private static DateTime ScanSyncDocumentsDirectoryMinExportDate(string syncDocumentsDirectoryPath)
+        {
+            const string FILENAME_PATTERN =
+                @"(?<YearTo>\d{4})(?<MonthTo>\d{2})(?<DayTo>\d{2})\.(zip|7z)";
+
+            DateTime latestFoundArchiveDate = DateTime.MinValue;
+
+            FileSystemUtils.ScanDirectoryRecursively(syncDocumentsDirectoryPath, f =>
+            {
+                var match = Regex.Match(f, FILENAME_PATTERN);
+                if (match.Success)
+                {
+                    var year = int.Parse(match.Groups["YearTo"].Value);
+                    var month = int.Parse(match.Groups["MonthTo"].Value);
+                    var day = int.Parse(match.Groups["DayTo"].Value);
+                    var tempDate = new DateTime(
+                        year: year,
+                        month: month,
+                        day: day,
+                        hour: 23,
+                        minute: 59,
+                        second: 59,
+                        millisecond: 999,
+                        DateTimeKind.Utc
+                        );
+                    if (tempDate > latestFoundArchiveDate)
+                    {
+                        latestFoundArchiveDate = tempDate;
+#if DEBUG
+                        logger.LogDebug($"Archive till '{tempDate}' found.");
+#endif
+                    }
+
+                }
+            });
+
+            return latestFoundArchiveDate;
+        }
+
+        /// <summary>
+        /// Returnes a HashSet of Id of Documents which are known from <paramref name="fromDate"/>.<br />
+        /// <paramref name="fromDate"/> could be calculated by function 
+        /// <see cref="ScanSyncDocumentsDirectoryMinExportDate"/>.
+        /// </summary>
+        private static HashSet<Guid> GetKnownDocumentIds(DateTime fromDate)
+        {
+            using var dbContext = DodbGateway.GetDbContext();
+            return dbContext
+                .Documents
+                .AsNoTracking()
+                .Where(d => d.DateCreatedUtc > fromDate)
+                .OrderBy(d => d.DateCreatedUtc)
+                .Select(d => d.Id)
+                .ToHashSet();
+        }
+
+        /// <summary>
+        /// Scans a <paramref name="syncDocumentsDirectoryPath"/> and returnes a dictionary
+        /// where key is a Document.Id (Guid) and value is a full path to file.
+        /// </summary>
+        private static Dictionary<Guid, string> GetExportedDocumentsIdAndPathDict(string syncDocumentsDirectoryPath)
+        {
+            const string FILENAME_PATTERN = @"(?<Tickes>\d{18,})_(?<Type>[A-Za-z]+)_" +
+                @"(?<DocumentId>[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})";
+
+            var foundDocumentsIdAndPath = new Dictionary<Guid, string>();
+
+            FileSystemUtils.ScanDirectoryRecursively(syncDocumentsDirectoryPath, f =>
+            {
+                var match = Regex.Match(f, FILENAME_PATTERN);
+                if (match.Success)
+                {
+                    var documentId = Guid.Parse(match.Groups["DocumentId"].Value);
+                    foundDocumentsIdAndPath.Add(documentId, f);
+                }
+            });
+
+            return foundDocumentsIdAndPath;
+        }
+
+        /// <summary>
+        /// Returnes a list of Document IDs which are need to be exported.<br />
+        /// <paramref name="knownDocumentIds"/> - from <see cref="GetKnownDocumentIds(DateTime)"/><br />
+        /// <paramref name="exportedDocumentsIdAndPathDict"/> - from <see cref="GetExportedDocumentsIdAndPathDict(string)"/>
+        /// </summary>
+        private static IEnumerable<Guid> GetDocumentIdsToExportList(
+            HashSet<Guid> knownDocumentIds,
+            Dictionary<Guid, string> exportedDocumentsIdAndPathDict)
+        {
+            return knownDocumentIds
+                .Where(id => !exportedDocumentsIdAndPathDict.ContainsKey(id))
+                .ToList();
+        }
+
+        /// <summary>
+        /// Returnes a dictionary (Id, Path) of documents which are need to be imported.
+        /// <paramref name="knownDocumentIds"/> - from <see cref="GetKnownDocumentIds(DateTime)"/><br />
+        /// </summary>
+        private static IDictionary<Guid, string> GetDocumentIdAndPathToImportDict(
+            HashSet<Guid> knownDocumentIds,
+            Dictionary<Guid, string> exportedDocumentsIdAndPathDict)
+        {
+            return exportedDocumentsIdAndPathDict
+                .Where(kvp => !knownDocumentIds.Contains(kvp.Key))
+                .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+        }
+
+        /// <summary>
+        /// Retreives documents from <paramref name="documentIdsToExportList"/> and exports them
+        /// into directory <paramref name="syncDocumentsDirectoryPath"/>.
+        /// </summary>
+        private static void ExportDocuments(IEnumerable<Guid> documentIdsToExportList, string syncDocumentsDirectoryPath)
+        {
+            using var dbContext = DodbGateway.GetDbContext();
+
+            foreach (var documentId in documentIdsToExportList)
+            {
+                var document = dbContext
+                    .Documents
+                    .AsNoTracking()
+                    .Where(d => d.Id == documentId)
+                    .Include(d => d.PayloadType)
+                    .First(); // we are sure it exists
+
+                var documentJsonValue = document.AsJson();
+
+                var syncDocumentsDirectoryWithSubFolderPath = Path.Combine(
+                    syncDocumentsDirectoryPath,
+                    document.DateCreatedUtc.ToString("yyyyMMdd"));
+
+                if (!FileSystemUtils.TouchDirectory(syncDocumentsDirectoryWithSubFolderPath))
+                {
+                    logger.LogError($"Can't create directory '{syncDocumentsDirectoryWithSubFolderPath}'. Sync operation stopped");
+                    return;
+                }
+
+                var shortFileName = $"{document.DateCreatedUtc.Ticks}_{document.PayloadType!.TypeName.FromLatest('.')}_{document.Id}.json";
+                var resultPath = Path.Combine(syncDocumentsDirectoryWithSubFolderPath, shortFileName);
+
+                File.WriteAllText(resultPath, documentJsonValue);
+
+                logger.LogTrace($"Document '{document.Id}' exported to '{resultPath}'");
+            }
+        }
+
+        /// <summary>
+        /// Peformes import of documents specified in <paramref name="documentIdAndPathToImportDict"/>.
+        /// </summary>
+        private static void ImportDocuments(IDictionary<Guid, string> documentIdAndPathToImportDict)
+        {
+            foreach (var kvp in documentIdAndPathToImportDict)
+            {
+                var document = FileSystemUtils.TryReadFromFile<Document>(kvp.Value);
+                if (document.Id != kvp.Key)
+                {
+                    logger.LogWarning($"Id mismatch during deserialization of file '{kvp.Value}'. Skipped");
+                    continue;
+                }
+
+                var payloadType = ReflectionUtils.FindTypeAccrossAppDomain(document.PayloadType?.TypeName);
+                if (payloadType == null)
+                {
+                    logger.LogError($"Type '{document.PayloadType?.TypeName}' from '{document.Id}' doesn't exists in current app domain");
+                    continue;
+                }
+
+                var dto = new DtoOf<object>
+                {
+                    Id = kvp.Key,
+                    UserId = document.UserId,
+                    RequiredDocumentId = document.RequiredDocumentId,
+                    DateCreatedUtc = document.DateCreatedUtc,
+                    Payload = FileSystemUtils.GetSerializer().Deserialize(document.PayloadJson, payloadType),
+                };
+
+                var pushResult = DodbGateway.PushDto(dto);
+
+                if (pushResult.IsSuccess())
+                    logger.LogInformation($"Document '{dto.Id}' imported");
+                else
+                    logger.LogError($"Unable to import document from file '{kvp.Value}': " +
+                        $"got '{pushResult.GetType().Name}' ({pushResult.AsJson()})");
+            }
+        }
+
+        #endregion
+
+        #endregion
+
+        #region DEBUG-only functions
 
 #if DEBUG
         /// <summary>
@@ -459,3 +663,34 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
     }
 }
+
+
+//public static void SyncPlugins()
+//{
+//    var knownPluginsTypes = ReflectionUtils.GetClassesThatImplementsInterface<IDodbSyncServicePlugin>();
+//    foreach (var pluginType in knownPluginsTypes)
+//    {
+//        var pluginInstance = (IDodbSyncServicePlugin)Activator.CreateInstance(pluginType)!;
+//        logger.LogInformation($"Found plugin '{pluginInstance.Name}'. Ready state: {pluginInstance.IsReady}.");
+
+//        try
+//        {
+//            if (pluginInstance.IsReady)
+//            {
+//                OnSyncPluginBeforeLaunch?.Invoke(null, pluginInstance);
+//                logger.LogInformation($"Starting Sync method of plugin '{pluginInstance.Name}'");
+//                pluginInstance.Sync();
+//            }
+//            else
+//            {
+//                logger.LogWarning($"Plugin '{pluginInstance.Name}' is not ready. Skip sync action.");
+//            }
+//            OnSyncPluginWorkComplete?.Invoke(null, pluginInstance);
+//        }
+//        catch (Exception ex)
+//        {
+//            logger.LogException(ex);
+//            OnSyncPluginError?.Invoke(null, new SyncPluginErrorEventArgs { Plugin = pluginInstance, Exception = ex });
+//        }
+//    }
+//}

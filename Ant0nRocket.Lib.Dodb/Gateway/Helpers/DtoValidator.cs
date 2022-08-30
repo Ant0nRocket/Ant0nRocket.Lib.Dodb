@@ -1,14 +1,14 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-using Ant0nRocket.Lib.Dodb.Abstractions;
-using Ant0nRocket.Lib.Dodb.Dtos;
+using Ant0nRocket.Lib.Dodb.Dto;
+using Ant0nRocket.Lib.Dodb.Dto.Payloads.Abstractions;
 using Ant0nRocket.Lib.Std20.Extensions;
 
 namespace Ant0nRocket.Lib.Dodb.Gateway.Helpers
 {
     internal class DtoValidator
     {
-        private readonly Dto dto;
+        private readonly DtoBase dto;
 
         public List<ValidationResult> ValidationResults { get; } = new();
 
@@ -18,7 +18,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway.Helpers
             .Distinct()
             .ToList();
 
-        public DtoValidator(Dto dto)
+        public DtoValidator(DtoBase dto)
         {
             this.dto = dto;
         }
