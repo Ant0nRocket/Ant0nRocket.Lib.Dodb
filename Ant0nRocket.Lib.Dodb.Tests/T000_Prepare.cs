@@ -32,9 +32,10 @@ namespace Ant0nRocket.Lib.Dodb.Tests
 
         private IGatewayResponse DtoHandlerMethod(object dtoPayloadObject, DodbContextBase dbContext)
         {
+            var c = (TestDbContext)dbContext;
             return dtoPayloadObject switch
             {
-                PldCreateUser p => UsersService.CreateUser(p, dbContext),
+                PldCreateUser p => UsersService.CreateUser(p, c),
                 AnnotatedPayload => new GrOk(),
                 ListPayload => new GrOk(),
                 _ => new GrDtoPayloadHandlerNotFound { DtoPayloadTypeName = $"{dtoPayloadObject.GetType()}" }

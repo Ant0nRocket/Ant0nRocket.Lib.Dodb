@@ -8,6 +8,7 @@ using Ant0nRocket.Lib.Dodb.Gateway;
 using Ant0nRocket.Lib.Dodb.Gateway.Responses;
 using Ant0nRocket.Lib.Dodb.Tests.Contexts;
 using Ant0nRocket.Lib.Dodb.Tests.Dto.Payloads.Mock;
+using Ant0nRocket.Lib.Dodb.Tests.Extensions;
 using Ant0nRocket.Lib.Dodb.Tests.Model;
 using Ant0nRocket.Lib.Dodb.Tests.Services.Responces.Mock;
 using Ant0nRocket.Lib.Std20.IO;
@@ -17,15 +18,14 @@ using NUnit.Framework;
 
 namespace Ant0nRocket.Lib.Dodb.Tests
 {
-    public class T002_DodbGateway
+    public class T001_DodbGateway_General
     {
         [Test]
         public void T001_SendingUnHandledDtoType()
         {
             var dto = new DtoOf<NotHandledPayload>() { UserId = Guid.NewGuid() };
             var result = DodbGateway.PushDto(dto);
-            Assert.That(result, Is.Not.Null);
-            Assert.That(result is GrDtoFromUnknownUser);
+            result.AssertIs<GrDtoPayloadHandlerNotFound>();
         }
 
         [Test]
@@ -39,14 +39,11 @@ namespace Ant0nRocket.Lib.Dodb.Tests
                     SomeStringValue = "Hello world"
                 },
                 UserId = Guid.NewGuid(), // mock, for passing basic validation
-                DateCreatedUtc = DateTime.Now // same reason
             };
 
             var result = DodbGateway.PushDto(dto);
 
-            Assert.That(result, Is.Not.Null);
-            Assert.That(result is GrDtoValidationFailed);
-            Assert.That((result as GrDtoValidationFailed)!.Errors.Count == 2);
+            Assert.AreEqual(2, result.AssertIs<GrDtoValidationFailed>().Errors.Count);
         }
 
         [Test]
@@ -61,9 +58,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
 
             var result = DodbGateway.PushDto(dto);
 
-            Assert.That(result, Is.Not.Null);
-            Assert.That(result is GrDtoValidationFailed);
-            Assert.That((result as GrDtoValidationFailed)!.Errors.Count == 1);
+            Assert.AreEqual(1, result.AssertIs<GrDtoValidationFailed>().Errors.Count);
         }
 
         [Test]
@@ -71,7 +66,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         {
             var dto = DodbGateway.CreateDto<ListPayload>();
             var pushResult = DodbGateway.PushDto(dto);
-            Assert.That(pushResult is GrDtoValidationFailed); // no items added
+            pushResult.AssertIs<GrDtoValidationFailed>(); // no items added
 
             // Valid
             dto.Payload.Items.Add(new() { SomeIntValue = 10, SomeStringValue = "12" });
@@ -92,36 +87,6 @@ namespace Ant0nRocket.Lib.Dodb.Tests
             Assert.That(pushResult is GrDtoValidationFailed);
         }
 
-        [Test]
-        public void T008_CleanupSyncDirectoryAndSyncAgain()
-        {
-            var syncDirectory = Path.Combine(FileSystemUtils.GetDefaultAppDataFolderPath(), "Sync");
-            FileSystemUtils.ScanDirectoryRecursively(syncDirectory, f => File.Delete(f)); // clean up
-            DodbGateway.SyncDocuments(syncDirectory); // should create 4 files
-
-            var filesList = new List<string>();
-            FileSystemUtils.ScanDirectoryRecursively(syncDirectory, f => filesList.Add(f));
-            Assert.AreEqual(4, filesList.Count);
-        }
-
-        [Test]
-        public void T009_CheckSyncPopulateDatabase()
-        {
-            // Make sure we have 4 files from prev. test
-            var syncDirectory = Path.Combine(FileSystemUtils.GetDefaultAppDataFolderPath(), "Sync");
-            var filesList = new List<string>();
-            FileSystemUtils.ScanDirectoryRecursively(syncDirectory, f => filesList.Add(f));
-            Assert.AreEqual(4, filesList.Count);
-
-            using var dbContext = new TestDbContext();
-            dbContext.Documents.RemoveRange(dbContext.Documents);
-            dbContext.Users.RemoveRange(dbContext.Users);
-            dbContext.SaveChanges();
-            Assert.AreEqual(false, dbContext.Documents.Any());
-
-            DodbGateway.SyncDocuments(syncDirectory);
-
-            Assert.AreEqual(4, dbContext.Documents.Count());
-        }
+        
     }
 }

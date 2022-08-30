@@ -8,9 +8,12 @@ namespace Ant0nRocket.Lib.Dodb.Tests.Extensions
 {
     internal static class GatewayResponseExtensions
     {
-        public static void AssertIs<T>(this IGatewayResponse gatewayResponse)
+        public static T AssertIs<T>(this IGatewayResponse gatewayResponse)
         {
+            Assert.NotNull(gatewayResponse);
             Assert.AreEqual(typeof(T), gatewayResponse.GetType());
+            if (gatewayResponse is T result) return result;
+            throw new ApplicationException("imposible");
         }
     }
 }
