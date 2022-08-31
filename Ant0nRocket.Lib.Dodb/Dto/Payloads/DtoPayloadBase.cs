@@ -1,5 +1,7 @@
 ﻿using Ant0nRocket.Lib.Dodb.Dto.Payloads.Abstractions;
 
+using Newtonsoft.Json;
+
 namespace Ant0nRocket.Lib.Dodb.Dto.Payloads
 {
     /// <summary>
@@ -23,6 +25,7 @@ namespace Ant0nRocket.Lib.Dodb.Dto.Payloads
         /// <summary>
         /// Short-hand for <see cref="GetCarrier()"/>.Id 
         /// </summary>
+        [JsonIgnore]
         public Guid __CarrierId => _dtoCarrier?.Id ?? default;
     }
 }
