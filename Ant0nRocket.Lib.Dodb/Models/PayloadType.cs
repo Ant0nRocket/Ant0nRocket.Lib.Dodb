@@ -8,6 +8,7 @@ namespace Ant0nRocket.Lib.Dodb.Models
     /// <summary>
     /// Entity for storing a type of a <see cref="Document.PayloadJson"/>.
     /// </summary>
+    [Table("__PayloadTypes")]
     public class PayloadType
     {
         /// <summary>
