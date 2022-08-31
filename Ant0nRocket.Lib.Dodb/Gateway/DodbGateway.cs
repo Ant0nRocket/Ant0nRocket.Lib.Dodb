@@ -63,7 +63,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
         /// <summary>
         /// Returnes a DbContext using <see cref="GetDbContextHandler"/> that was registered with
-        /// <see cref="Initialize(GetDbContextHandler, DtoPayloadHandler, GetPasswordHashHandler)"/>.
+        /// <see cref="Initialize(GetDbContextHandler, DtoPayloadHandler)"/>.
         /// </summary>
         internal static DodbContextBase GetDbContext() =>
             _getDbContextHandler?.Invoke() ?? throw new ApplicationException(ERROR_GETTING_DBCONTEXT);
@@ -97,24 +97,12 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
         /// </summary>
         public static void Initialize(
             GetDbContextHandler getDbContextHandler,
-            DtoPayloadHandler dtoPayloadHandler,
-            GetPasswordHashHandler? getPasswordHashHandler = null)
+            DtoPayloadHandler dtoPayloadHandler)
         {
             if (_isInitialized) return;
 
             _getDbContextHandler = getDbContextHandler ?? throw new NullReferenceException(nameof(getDbContextHandler));
             _dtoPayloadHandler = dtoPayloadHandler ?? throw new NullReferenceException(nameof(dtoPayloadHandler));
-
-            if (getPasswordHashHandler == null)
-            {
-                logger.LogInformation("Password hasher function wasn't provided. Internal function will be used.");
-                _getPasswordHashHandler = DefaultPasswordHashHandler;
-            }
-            else
-            {
-                logger.LogInformation("Password hasher function was provided. External function will be used.");
-                _getPasswordHashHandler = getPasswordHashHandler;
-            }
 
             RegisterKnownPayloadTypes();
 
