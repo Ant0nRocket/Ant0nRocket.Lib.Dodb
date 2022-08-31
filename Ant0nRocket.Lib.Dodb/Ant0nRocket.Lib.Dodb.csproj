@@ -6,14 +6,14 @@
     <Nullable>enable</Nullable>
     <PackageProjectUrl>https://github.com/Ant0nRocket/Ant0nRocket.Lib.Dodb</PackageProjectUrl>
     <Copyright>Ant0nRocket</Copyright>
-    <Version>3.0.2.2</Version>
+    <Version>3.0.2.3</Version>
     <PackageLicenseExpression>Beerware</PackageLicenseExpression>
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
     <Description>Core of Document-Oriented DataBase</Description>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Ant0nRocket.Lib.Std20" Version="1.8.9" />
+    <PackageReference Include="Ant0nRocket.Lib.Std20" Version="1.8.10" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="6.0.8" />
   </ItemGroup>
 

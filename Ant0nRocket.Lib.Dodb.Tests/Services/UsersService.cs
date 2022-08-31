@@ -41,7 +41,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests.Services
                     PasswordHash = dtoPayload.PasswordHash,
                     IsAdmin = dtoPayload.IsAdmin,
                     IsHidden = dtoPayload.IsHidden,
-                    DocumentRefId = dtoPayload.GetCarrier()!.Id,
+                    DocumentRefId = dtoPayload.__CarrierId,
                 };
                 dbContext.Users.Add(user);
                 return new GrCreateUser_Success();

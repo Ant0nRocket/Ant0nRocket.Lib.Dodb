@@ -232,8 +232,8 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                 }
             }
 
-            var externalValidationResult = onDatabaseValidation?.Invoke(dto, dbContext) ?? true;
-            if (externalValidationResult == false)
+            var externalDatabaseValidationResult = onDatabaseValidation?.Invoke(dto, dbContext) ?? true;
+            if (externalDatabaseValidationResult == false)
             {
                 var message = $"DTO '{dto.Id}' didn't pass database validation";
                 logger.LogError(message);

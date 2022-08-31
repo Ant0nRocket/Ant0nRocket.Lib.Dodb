@@ -67,13 +67,5 @@ namespace Ant0nRocket.Lib.Dodb.Gateway.Helpers
         {
             ValidationResults.Add(new ValidationResult(errorText, new[] { propertyName }));
         }
-
-
-        [Obsolete]
-        public bool DidntFindAnyErrors => ErrorsList?.Count == 0;
-
-        [Obsolete]
-        public bool HasFoundErrors => !DidntFindAnyErrors;
-
     }
 }

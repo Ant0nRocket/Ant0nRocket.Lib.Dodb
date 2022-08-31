@@ -19,5 +19,10 @@ namespace Ant0nRocket.Lib.Dodb.Dto.Payloads
 
         /// <inheritdoc />
         public void RegisterCarrier(DtoBase dtoCarrier) => _dtoCarrier = dtoCarrier;
+
+        /// <summary>
+        /// Short-hand for <see cref="GetCarrier()"/>.Id 
+        /// </summary>
+        public Guid __CarrierId => _dtoCarrier?.Id ?? default;
     }
 }
