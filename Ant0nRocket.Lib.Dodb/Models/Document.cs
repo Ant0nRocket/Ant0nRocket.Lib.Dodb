@@ -32,17 +32,6 @@ namespace Ant0nRocket.Lib.Dodb.Models
         public Document? RequiredDocument { get; set; }
 
         /// <summary>
-        /// <b>ATTENSION!</b><br />
-        /// It's obvious that every document has it's author. But
-        /// during development of this library I can't be shure in which
-        /// table you prefer to store users. How do you call them? Etc.<br />
-        /// Please, fill free to populate this field with any Id you want.<br />
-        /// But don't forget to set foreign keys in your DbContext!<br />
-        /// Of course, validation is on your side.
-        /// </summary>
-        public Guid? UserId { get; set; }
-
-        /// <summary>
         /// A payload of a DTO, that created this document, serialized as JSON.
         /// </summary>
         [Required]
@@ -62,5 +51,20 @@ namespace Ant0nRocket.Lib.Dodb.Models
         /// </summary>
         [Required]
         public DateTime DateCreatedUtc { get; set; }
+
+        /************************************************************************
+         * COLLECTION OF PROPERTIES THAT COULD BE USEFULL IF YOU NEED THEM.
+         * IF YOU DON'T WANT - DON'T USE THEM.
+         ************************************************************************/
+
+        /// <summary>
+        /// Posible Id of an author of the document.
+        /// </summary>
+        public Guid? UserId { get; set; }
+
+        /// <summary>
+        /// Posible storage Id.
+        /// </summary>
+        public Guid? StorageId { get; set; }
     }
 }

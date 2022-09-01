@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <PackageProjectUrl>https://github.com/Ant0nRocket/Ant0nRocket.Lib.Dodb</PackageProjectUrl>
     <Copyright>Ant0nRocket</Copyright>
-    <Version>3.0.2.4</Version>
+    <Version>3.0.3.1</Version>
     <PackageLicenseExpression>Beerware</PackageLicenseExpression>
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
     <Description>Core of Document-Oriented DataBase</Description>
