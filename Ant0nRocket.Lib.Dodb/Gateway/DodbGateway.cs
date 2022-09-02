@@ -201,9 +201,6 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                 dbContext.Database.BeginTransaction() : // our context - our transaction
                 null; // external context - no transactions required!
 
-            if (transaction != default)
-                logger.LogDebug($"Transaction '{transaction.TransactionId}' started...");
-
             #region Database validations
 
             if (dbContext.Documents.Any(d => d.Id == dto.Id))
@@ -269,13 +266,12 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                     beforeCommit?.Invoke(dto, dbContext);
                     dbContext.SaveChanges();
                     transaction?.Commit();
-                    logger.LogDebug($"Transaction '{transaction?.TransactionId}' commited");
                 }
                 catch (Exception ex)
                 {
                     var message = $"{ex.Message} " + ex.InnerException?.Message ?? string.Empty;
                     pushResult = new GrDtoPushFailed { Message = message };
-                    logger.LogException(ex, $"Unable to proceed DTO '{dto.Id}'");
+                    logger.LogException(ex, $"DTO '{dto.Id}'");
                 }
                 finally
                 {
