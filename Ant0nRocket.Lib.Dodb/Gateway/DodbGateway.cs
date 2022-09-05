@@ -45,8 +45,6 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
         private const string ERROR_GETTING_DBCONTEXT = $"Can't create DbContext. Check {nameof(Initialize)} were called with non-null args.";
         private const string ERROR_GETTING_PASSWORD_HASHER = $"Can't get password hasher. Check {nameof(Initialize)} were called with non-null args";
         private const string ERROR_NOT_INITIALIZED = $"Call {nameof(Initialize)} before using {nameof(DodbGateway)}";
-
-        private const string ERROR_NEED_REGISTER_IPAYLOADS = $"Call {nameof(RegisterKnownPayloadTypes)} to register IPayload classes";
         private const string ERROR_IPAYLOADS_REG_FAILED = "Failed to register IPayload classes";
 
         #endregion
@@ -104,8 +102,6 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             _getDbContextHandler = getDbContextHandler ?? throw new NullReferenceException(nameof(getDbContextHandler));
             _dtoPayloadHandler = dtoPayloadHandler ?? throw new NullReferenceException(nameof(dtoPayloadHandler));
 
-            RegisterKnownPayloadTypes();
-
             // Important to set this flag here! TouchUser will throw if false.
             _isInitialized = true;
         }
@@ -147,22 +143,29 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                 TryHandleDtoPayloadExternally(dtoPayload, dbContext) ??
                 new GrDtoPayloadHandlerNotFound();
 
+            var documentPayload = new DocumentPayload
+            {
+                DocumentRefId = dto.Id,
+                PayloadTypeName = dtoPayload.GetType().FullName,
+                PayloadJson = dtoPayload.AsJson(pretty: false),
+            };
+
             var document = new Document
             {
                 Id = dto.Id,
                 UserId = dto.UserId,
                 RequiredDocumentId = dto.RequiredDocumentId,
                 DateCreatedUtc = dto.DateCreatedUtc,
-                PayloadTypeId = GetPayloadTypeId(dtoPayload),
-                PayloadJson = dtoPayload.AsJson()
+                DocumentPayloadId = documentPayload.Id,
             };
 
             dbContext.Documents.Add(document);
+            dbContext.DocumentPayloads.Add(documentPayload);
             return dtoHandleResponse;
         }
 
         /// <summary>
-        /// 1. Throws <see cref="ApplicationException"/> if library wasn't initialized (see <see cref="Initialize(GetDbContextHandler, DtoPayloadHandler, Gateway.GetPasswordHashHandler?)"/>.<br />
+        /// 1. Throws <see cref="ApplicationException"/> if library wasn't initialized (see <see cref="Initialize(GetDbContextHandler, DtoPayloadHandler)"/>.<br />
         /// 2. Returnes <see cref="GrDtoValidationFailed"/> if there are some validation errors in DTO or its payload.<br />
         /// 4. Returnes <see cref="GrDtoDocumentExists"/> if any document with <paramref name="dto"/>.Id already exists.<br />
         /// 5. Returnes <see cref="GrDtoRequiredDocumentNotFound"/> if there is some document required to exist but not found.<br />
@@ -291,58 +294,6 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
         #region Private helper functions
 
-        /// <summary>
-        /// Goes through current app domain and register all classes of type IPayload
-        /// in database.
-        /// </summary>
-        private static void RegisterKnownPayloadTypes()
-        {
-            _payloadType_Id_Cache.Clear();
-
-            using var dbContext = GetDbContext();
-
-            var knownPayloadTypesFromReflection = ReflectionUtils.GetClassesThatImplementsInterface<IPayload>();
-            var knownPayloadTypesFromDatabase = dbContext
-                .PayloadTypes
-                .AsNoTracking()
-                .Select(p => p.TypeName)
-                .ToList();
-
-            var payloadTypesToAdd = new HashSet<string>();
-
-            foreach (var payloadTypeFromReflection in knownPayloadTypesFromReflection)
-            {
-                if (!knownPayloadTypesFromDatabase.Contains(payloadTypeFromReflection.FullName))
-                {
-                    payloadTypesToAdd.AddSecure(payloadTypeFromReflection.FullName ??
-                        throw new NullReferenceException("Name of a type is null"));
-                }
-            }
-
-            foreach (var typeName in payloadTypesToAdd)
-                dbContext.PayloadTypes.Add(new PayloadType { TypeName = typeName });
-
-            if (payloadTypesToAdd.Count > 0)
-                if (dbContext.SaveChanges() <= 0)
-                    throw new ApplicationException(ERROR_IPAYLOADS_REG_FAILED);
-
-            dbContext.PayloadTypes.ToList().ForEach(pt =>
-            {
-                var typeName = pt.TypeName ?? throw new NullReferenceException();
-                _payloadType_Id_Cache.Add(typeName, pt.Id);
-            });
-        }
-
-        /// <summary>
-        /// Returnes DTO payload type Id.
-        /// </summary>
-        private static int GetPayloadTypeId(object dtoPayload)
-        {
-            var typeName = dtoPayload.GetType().FullName ?? string.Empty;
-            if (_payloadType_Id_Cache.ContainsKey(typeName))
-                return _payloadType_Id_Cache[typeName];
-            return int.MinValue;
-        }
 
         #endregion
 
@@ -549,7 +500,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                     .Documents
                     .AsNoTracking()
                     .Where(d => d.Id == documentId)
-                    .Include(d => d.PayloadType)
+                    .Include(d => d.DocumentPayload)
                     .First(); // we are sure it exists
 
                 var documentJsonValue = document.AsJson();
@@ -564,7 +515,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                     return;
                 }
 
-                var shortFileName = $"{document.DateCreatedUtc.Ticks}_{document.PayloadType!.TypeName.FromLatest('.')}_{document.Id}.json";
+                var shortFileName = $"{document.DateCreatedUtc.Ticks}_{document.DocumentPayload.PayloadTypeName.FromLatest('.')}_{document.Id}.json";
                 var resultPath = Path.Combine(syncDocumentsDirectoryWithSubFolderPath, shortFileName);
 
                 File.WriteAllText(resultPath, documentJsonValue);
@@ -587,10 +538,10 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                     continue;
                 }
 
-                var payloadType = ReflectionUtils.FindTypeAccrossAppDomain(document.PayloadType?.TypeName);
+                var payloadType = ReflectionUtils.FindTypeAccrossAppDomain(document.DocumentPayload.PayloadTypeName);
                 if (payloadType == null)
                 {
-                    logger.LogError($"Type '{document.PayloadType?.TypeName}' from '{document.Id}' doesn't exists in current app domain");
+                    logger.LogError($"Type '{document.DocumentPayload.PayloadTypeName}' from '{document.Id}' doesn't exists in current app domain");
                     continue;
                 }
 
@@ -600,7 +551,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                     UserId = document.UserId,
                     RequiredDocumentId = document.RequiredDocumentId,
                     DateCreatedUtc = document.DateCreatedUtc,
-                    Payload = FileSystemUtils.GetSerializer().Deserialize(document.PayloadJson, payloadType),
+                    Payload = FileSystemUtils.GetSerializer().Deserialize(document.DocumentPayload.PayloadJson, payloadType),
                 };
 
                 var pushResult = DodbGateway.PushDto(dto);
@@ -634,7 +585,6 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             {
                 ctx.Database.EnsureDeleted();
                 ctx.Database.EnsureCreated();
-                RegisterKnownPayloadTypes();
             }
             else
             {

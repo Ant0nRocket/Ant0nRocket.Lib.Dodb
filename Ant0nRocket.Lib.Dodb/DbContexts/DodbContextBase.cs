@@ -17,11 +17,12 @@ namespace Ant0nRocket.Lib.Dodb.DbContexts
         /// <summary>
         /// All known payload types of AppDomain.
         /// </summary>
-        public DbSet<PayloadType> PayloadTypes { get; set;}
+        public DbSet<DocumentPayload> DocumentPayloads { get; set;}
 
+        /// <inheritdoc />
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            modelBuilder.Entity<PayloadType>().HasIndex(p => p.TypeName).IsUnique();
+            modelBuilder.Entity<DocumentPayload>().HasIndex(p => p.PayloadTypeName).IsUnique(false);
         }
     }
 }

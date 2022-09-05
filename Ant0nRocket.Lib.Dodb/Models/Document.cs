@@ -31,20 +31,9 @@ namespace Ant0nRocket.Lib.Dodb.Models
         [JsonIgnore]
         public Document? RequiredDocument { get; set; }
 
-        /// <summary>
-        /// A payload of a DTO, that created this document, serialized as JSON.
-        /// </summary>
-        [Required]
-        public string? PayloadJson { get; set; }
+        public DocumentPayload DocumentPayload { get; set; }
 
-        /// <inheritdoc cref="PayloadType.Id"/>
-        [JsonIgnore]
-        public int PayloadTypeId { get; set; }
-
-        /// <summary>
-        /// One-to-one relation to type of payload.
-        /// </summary>
-        public PayloadType? PayloadType { get; set; }
+        public Guid DocumentPayloadId { get; set; }
 
         /// <summary>
         /// Timestamp (UTC).
@@ -61,10 +50,5 @@ namespace Ant0nRocket.Lib.Dodb.Models
         /// Posible Id of an author of the document.
         /// </summary>
         public Guid? UserId { get; set; }
-
-        /// <summary>
-        /// Posible storage Id.
-        /// </summary>
-        public Guid? StorageId { get; set; }
     }
 }
