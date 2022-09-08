@@ -1,6 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using Ant0nRocket.Lib.Dodb.Models.Abstractions;
 using Newtonsoft.Json;
 
 namespace Ant0nRocket.Lib.Dodb.Models
@@ -8,7 +7,7 @@ namespace Ant0nRocket.Lib.Dodb.Models
     /// <summary>
     /// Base class for entities.
     /// </summary>
-    public abstract class EntityBase : IEntityBase
+    public abstract class EntityBase
     {
         /// <summary>
         /// Id of entity

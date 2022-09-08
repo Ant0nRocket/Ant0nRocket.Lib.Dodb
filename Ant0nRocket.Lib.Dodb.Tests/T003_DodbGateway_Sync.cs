@@ -1,10 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
-using Ant0nRocket.Lib.Dodb.Gateway;
+
 using Ant0nRocket.Lib.Dodb.Tests.Contexts;
 using Ant0nRocket.Lib.Std20.IO;
 
@@ -15,11 +13,11 @@ namespace Ant0nRocket.Lib.Dodb.Tests
     public class T003_DodbGateway_Sync : DodbTestsBase
     {
         [Test]
-        public void T008_CleanupSyncDirectoryAndSyncAgain()
+        public async Task T008_CleanupSyncDirectoryAndSyncAgain()
         {
             var syncDirectory = Path.Combine(FileSystemUtils.GetDefaultAppDataFolderPath(), "Sync");
             FileSystemUtils.ScanDirectoryRecursively(syncDirectory, f => File.Delete(f)); // clean up
-            DodbGateway.SyncDocuments(syncDirectory); // should create 2 files
+            await Dodb.SyncDocumentsAsync(syncDirectory); // should create 2 files
 
             var filesList = new List<string>();
             FileSystemUtils.ScanDirectoryRecursively(syncDirectory, f => filesList.Add(f));
@@ -27,7 +25,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         }
 
         [Test]
-        public void T009_CheckSyncPopulateDatabase()
+        public async Task T009_CheckSyncPopulateDatabase()
         {
             // Make sure we have 4 files from prev. test
             var syncDirectory = Path.Combine(FileSystemUtils.GetDefaultAppDataFolderPath(), "Sync");
@@ -41,7 +39,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
             dbContext.SaveChanges();
             Assert.AreEqual(false, dbContext.Documents.Any());
 
-            DodbGateway.SyncDocuments(syncDirectory);
+            await Dodb.SyncDocumentsAsync(syncDirectory);
 
             Assert.AreEqual(2, dbContext.Documents.Count());
         }

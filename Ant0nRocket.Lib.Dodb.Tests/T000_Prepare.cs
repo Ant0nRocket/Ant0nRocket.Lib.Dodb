@@ -1,6 +1,5 @@
 ﻿using Ant0nRocket.Lib.Dodb.DbContexts;
 using Ant0nRocket.Lib.Dodb.Dto;
-using Ant0nRocket.Lib.Dodb.Gateway;
 using Ant0nRocket.Lib.Dodb.Gateway.Abstractions;
 using Ant0nRocket.Lib.Dodb.Gateway.Responses;
 using Ant0nRocket.Lib.Dodb.Tests.Contexts;
@@ -25,7 +24,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
             BasicLogWritter.LogFileNamePrefix = "DodbGateway.Tests_";
             Logger.LogToBasicLogWritter = true;
 
-            DodbGateway.Initialize(
+            Dodb.Initialize(
                 getDbContextHandler: () => new TestDbContext(),
                 dtoPayloadHandler: DtoHandlerMethod);
         }

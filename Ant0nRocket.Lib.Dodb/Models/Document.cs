@@ -8,7 +8,7 @@ namespace Ant0nRocket.Lib.Dodb.Models
     /// Key element of a library. Every operation that changes
     /// a database is a <see cref="Document"/>. Inside of a Document
     /// there are all the data required to reproduce changes that was made.<br />
-    /// Additionally, <see cref="Gateway.DodbGateway"/> can
+    /// Additionally, <see cref="Lib.Dodb.Dodb"/> can
     /// export documents to disk and read them back later. This feature
     /// allowes you to sync you data across as many devices as you may need.
     /// </summary>

@@ -1,13 +1,14 @@
-﻿using System.Text.RegularExpressions;
+﻿using System.Runtime.CompilerServices;
+using System.Text.RegularExpressions;
 
 using Ant0nRocket.Lib.Dodb.DbContexts;
 using Ant0nRocket.Lib.Dodb.Dto;
 using Ant0nRocket.Lib.Dodb.Dto.Payloads.Abstractions;
 using Ant0nRocket.Lib.Dodb.Extensions;
+using Ant0nRocket.Lib.Dodb.Gateway;
 using Ant0nRocket.Lib.Dodb.Gateway.Abstractions;
 using Ant0nRocket.Lib.Dodb.Gateway.Helpers;
 using Ant0nRocket.Lib.Dodb.Gateway.Responses;
-using Ant0nRocket.Lib.Dodb.Gateway.Responses.Attributes;
 using Ant0nRocket.Lib.Dodb.Models;
 using Ant0nRocket.Lib.Std20.Cryptography;
 using Ant0nRocket.Lib.Std20.Extensions;
@@ -17,7 +18,7 @@ using Ant0nRocket.Lib.Std20.Reflection;
 
 using Microsoft.EntityFrameworkCore;
 
-namespace Ant0nRocket.Lib.Dodb.Gateway
+namespace Ant0nRocket.Lib.Dodb
 {
     /// <summary>
     /// A gateway for document-oriented database.<br />
@@ -28,13 +29,15 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
     ///     DodbGateway.RegisterDtoPayloadHandler([...Method that will handle your Dto objects...]);
     /// </code>
     /// </summary>
-    public static class DodbGateway
+    public static class Dodb
     {
         #region Private fields
 
-        private static readonly Logger logger = Logger.Create(nameof(DodbGateway));
+        private static readonly Logger logger = Logger.Create(nameof(Dodb));
 
         private static bool _isInitialized = false;
+
+        private static Mutex _mutex = new();
 
         private static readonly Dictionary<string, int> _payloadType_Id_Cache = new();
 
@@ -44,7 +47,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
         private const string ERROR_GETTING_DBCONTEXT = $"Can't create DbContext. Check {nameof(Initialize)} were called with non-null args.";
         private const string ERROR_GETTING_PASSWORD_HASHER = $"Can't get password hasher. Check {nameof(Initialize)} were called with non-null args";
-        private const string ERROR_NOT_INITIALIZED = $"Call {nameof(Initialize)} before using {nameof(DodbGateway)}";
+        private const string ERROR_NOT_INITIALIZED = $"Call {nameof(Initialize)} before using {nameof(Dodb)}";
         private const string ERROR_IPAYLOADS_REG_FAILED = "Failed to register IPayload classes";
 
         #endregion
@@ -178,12 +181,14 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
         /// a business of current function. If you need just push DTO and commit it - dont set <paramref name="externalDbContext"/>!
         /// </summary>
         public static IGatewayResponse PushDto(
-            DtoBase dto, 
+            DtoBase dto,
             DodbContextBase? externalDbContext = default,
             Func<DtoBase, DodbContextBase, bool>? onDatabaseValidation = null,
             Action<DtoBase, DodbContextBase>? beforeCommit = null)
         {
             if (!_isInitialized) throw new ApplicationException(ERROR_NOT_INITIALIZED);
+
+            _mutex.WaitOne(); // thread will stop here if mutex is busy
 
             #region Basic validation (will check properties according to annotations)
 
@@ -287,19 +292,19 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
             #endregion
 
+            _mutex.ReleaseMutex(); // other threads could work now
+
             return pushResult;
         }
 
-        #endregion
-
-        #region Private helper functions
-
-
-        #endregion
-
-        #region Internal helper functions
-
-
+        /// <inheritdoc cref="PushDto(DtoBase, DodbContextBase?, Func{DtoBase, DodbContextBase, bool}?, Action{DtoBase, DodbContextBase}?)"/>
+        public static async Task<IGatewayResponse> PushDtoAsync(
+            DtoBase dto,
+            DodbContextBase? externalDbContext = default,
+            Func<DtoBase, DodbContextBase, bool>? onDatabaseValidation = null,
+            Action<DtoBase, DodbContextBase>? beforeCommit = null) => 
+            await Task.Run(() => PushDto(dto, externalDbContext, onDatabaseValidation, beforeCommit));
+        
 
         #endregion
 
@@ -333,6 +338,10 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
 
         #region Sync documents
+
+        /// <inheritdoc cref="SyncDocuments(string)"/>
+        public static async Task SyncDocumentsAsync(string syncDocumentsDirectoryPath) =>
+            await Task.Run(() => SyncDocuments(syncDocumentsDirectoryPath));
 
         /// <summary>
         /// Performes syncthronization of known Documents inside <paramref name="syncDocumentsDirectoryPath"/>.<br />
@@ -425,7 +434,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
         /// </summary>
         private static HashSet<Guid> GetKnownDocumentIds(DateTime fromDate)
         {
-            using var dbContext = DodbGateway.GetDbContext();
+            using var dbContext = GetDbContext();
             return dbContext
                 .Documents
                 .AsNoTracking()
@@ -492,7 +501,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
         /// </summary>
         private static void ExportDocuments(IEnumerable<Guid> documentIdsToExportList, string syncDocumentsDirectoryPath)
         {
-            using var dbContext = DodbGateway.GetDbContext();
+            using var dbContext = GetDbContext();
 
             foreach (var documentId in documentIdsToExportList)
             {
@@ -515,7 +524,7 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                     return;
                 }
 
-                var shortFileName = $"{document.DateCreatedUtc.Ticks}_{document.DocumentPayload.PayloadTypeName.FromLatest('.')}_{document.Id}.json";
+                var shortFileName = $"{document.DateCreatedUtc.Ticks}_{document.DocumentPayload.PayloadTypeName!.FromLatest('.')}_{document.Id}.json";
                 var resultPath = Path.Combine(syncDocumentsDirectoryWithSubFolderPath, shortFileName);
 
                 File.WriteAllText(resultPath, documentJsonValue);
@@ -532,13 +541,13 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
             foreach (var kvp in documentIdAndPathToImportDict)
             {
                 var document = FileSystemUtils.TryReadFromFile<Document>(kvp.Value);
-                if (document.Id != kvp.Key)
+                if (document!.Id != kvp.Key)
                 {
                     logger.LogWarning($"Id mismatch during deserialization of file '{kvp.Value}'. Skipped");
                     continue;
                 }
 
-                var payloadType = ReflectionUtils.FindTypeAccrossAppDomain(document.DocumentPayload.PayloadTypeName);
+                var payloadType = ReflectionUtils.FindTypeAccrossAppDomain(document.DocumentPayload.PayloadTypeName!);
                 if (payloadType == null)
                 {
                     logger.LogError($"Type '{document.DocumentPayload.PayloadTypeName}' from '{document.Id}' doesn't exists in current app domain");
@@ -551,10 +560,10 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
                     UserId = document.UserId,
                     RequiredDocumentId = document.RequiredDocumentId,
                     DateCreatedUtc = document.DateCreatedUtc,
-                    Payload = FileSystemUtils.GetSerializer().Deserialize(document.DocumentPayload.PayloadJson, payloadType),
+                    Payload = FileSystemUtils.GetSerializer().Deserialize(document.DocumentPayload.PayloadJson!, payloadType),
                 };
 
-                var pushResult = DodbGateway.PushDto(dto);
+                var pushResult = PushDto(dto);
 
                 if (pushResult.IsSuccess())
                     logger.LogInformation($"Document '{dto.Id}' imported");
@@ -597,34 +606,3 @@ namespace Ant0nRocket.Lib.Dodb.Gateway
 
     }
 }
-
-
-//public static void SyncPlugins()
-//{
-//    var knownPluginsTypes = ReflectionUtils.GetClassesThatImplementsInterface<IDodbSyncServicePlugin>();
-//    foreach (var pluginType in knownPluginsTypes)
-//    {
-//        var pluginInstance = (IDodbSyncServicePlugin)Activator.CreateInstance(pluginType)!;
-//        logger.LogInformation($"Found plugin '{pluginInstance.Name}'. Ready state: {pluginInstance.IsReady}.");
-
-//        try
-//        {
-//            if (pluginInstance.IsReady)
-//            {
-//                OnSyncPluginBeforeLaunch?.Invoke(null, pluginInstance);
-//                logger.LogInformation($"Starting Sync method of plugin '{pluginInstance.Name}'");
-//                pluginInstance.Sync();
-//            }
-//            else
-//            {
-//                logger.LogWarning($"Plugin '{pluginInstance.Name}' is not ready. Skip sync action.");
-//            }
-//            OnSyncPluginWorkComplete?.Invoke(null, pluginInstance);
-//        }
-//        catch (Exception ex)
-//        {
-//            logger.LogException(ex);
-//            OnSyncPluginError?.Invoke(null, new SyncPluginErrorEventArgs { Plugin = pluginInstance, Exception = ex });
-//        }
-//    }
-//}

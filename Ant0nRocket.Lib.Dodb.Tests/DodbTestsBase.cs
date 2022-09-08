@@ -1,7 +1,6 @@
 ﻿using System;
 
 using Ant0nRocket.Lib.Dodb.Dto;
-using Ant0nRocket.Lib.Dodb.Gateway;
 using Ant0nRocket.Lib.Dodb.Gateway.Abstractions;
 using Ant0nRocket.Lib.Std20;
 using Ant0nRocket.Lib.Std20.IO;
@@ -43,8 +42,8 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         }
 
         protected static DtoOf<T> CreateDto<T>(Guid? userId = default) where T : class, new() =>
-            DodbGateway.CreateDto<T>(userId);
+            Dodb.CreateDto<T>(userId);
 
-        protected IGatewayResponse Push(DtoBase dto) => DodbGateway.PushDto(dto);
+        protected IGatewayResponse Push(DtoBase dto) => Dodb.PushDto(dto);
     }
 }
