@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 
 using Ant0nRocket.Lib.Dodb.DbContexts;
@@ -40,6 +41,76 @@ namespace Ant0nRocket.Lib.Dodb
         private static Mutex _mutex = new();
 
         private static readonly Dictionary<string, int> _payloadType_Id_Cache = new();
+
+        #endregion
+
+        #region Events
+
+        /// <summary>
+        /// Raised when <see cref="SyncDocuments(string)"/> start working.<br />
+        /// At this moment mutex have just been locked.
+        /// </summary>
+        public static event EventHandler? OnSyncDocumentsStarted;
+
+        /// <summary>
+        /// Stage 1 (see <see cref="Stage1_ScanSyncDocumentsDirectoryMinExportDate(string)"/>)
+        /// searches minimum date for exporting (UTC format).<br />
+        /// </summary>
+        public static event EventHandler<DateTime>? OnStage1_Complete;
+
+        /// <summary>
+        /// Stage 2 (see <see cref="Stage2_GetKnownDocumentIds(DateTime)"/>
+        /// retreives known documents Id list. Count of known documents will be passed.
+        /// </summary>
+        public static event EventHandler<int>? OnStage2_Complete;
+
+        /// <summary>
+        /// Stage 3 (see <see cref="Stage3_GetExportedDocumentsIdAndPathDict(string)"/>
+        /// retreives a dictionary of [DocumentId, DocumentPath] for all located in
+        /// sync directory files.
+        /// </summary>
+        public static event EventHandler<int>? OnStage3_Complete;
+
+        /// <summary>
+        /// Stage 4 calculates which documents required to be exported.
+        /// </summary>
+        public static event EventHandler<int>? OnStage4_Complete;
+
+        /// <summary>
+        /// Stage 5 calculates which documents required to be imported.
+        /// </summary>
+        public static event EventHandler<int>? OnStage5_Complete;
+
+        /// <summary>
+        /// Stage 6 is actual exporting of documents.
+        /// </summary>
+        public static event EventHandler OnStage6_Started;
+
+        /// <summary>
+        /// When document exported.
+        /// </summary>
+        public static event EventHandler<Guid>? OnStage6_WorkUnitDone;
+
+        /// <summary>
+        /// Stage 7 is actual importing of documents.
+        /// </summary>
+        public static event EventHandler OnStage7_Started;
+
+        /// <summary>
+        /// When document imported.
+        /// </summary>
+        public static event EventHandler<Guid>? OnStage7_WorkUnitDone;
+
+        /// <summary>
+        /// When import of document failed for any reason.
+        /// </summary>
+        public static event EventHandler<IGatewayResponse>? OnStage7_WorkUnitFailed;
+
+        /// <summary>
+        /// Raised when <see cref="SyncDocuments(string)"/> finished working (no matter why).<br />
+        /// At this moment mutex have just become free.
+        /// </summary>
+        public static event EventHandler? OnSyncDocumentsFinished;
 
         #endregion
 
@@ -180,6 +251,7 @@ namespace Ant0nRocket.Lib.Dodb
         /// If <paramref name="externalDbContext"/> passed then all transaction control, saving, disposing - is not 
         /// a business of current function. If you need just push DTO and commit it - dont set <paramref name="externalDbContext"/>!
         /// </summary>
+        [Obsolete("Avoid using it directly! Other threads could work, make sure you are right! Use")]
         public static IGatewayResponse PushDto(
             DtoBase dto,
             DodbContextBase? externalDbContext = default,
@@ -187,8 +259,6 @@ namespace Ant0nRocket.Lib.Dodb
             Action<DtoBase, DodbContextBase>? beforeCommit = null)
         {
             if (!_isInitialized) throw new ApplicationException(ERROR_NOT_INITIALIZED);
-
-            _mutex.WaitOne(); // thread will stop here if mutex is busy
 
             #region Basic validation (will check properties according to annotations)
 
@@ -292,8 +362,6 @@ namespace Ant0nRocket.Lib.Dodb
 
             #endregion
 
-            _mutex.ReleaseMutex(); // other threads could work now
-
             return pushResult;
         }
 
@@ -302,8 +370,17 @@ namespace Ant0nRocket.Lib.Dodb
             DtoBase dto,
             DodbContextBase? externalDbContext = default,
             Func<DtoBase, DodbContextBase, bool>? onDatabaseValidation = null,
-            Action<DtoBase, DodbContextBase>? beforeCommit = null) => 
-            await Task.Run(() => PushDto(dto, externalDbContext, onDatabaseValidation, beforeCommit));
+            Action<DtoBase, DodbContextBase>? beforeCommit = null)
+        {
+            _mutex.WaitOne(); // thread will stop here if mutex is busy
+
+            var pushResult = await Task
+                .Run(() => PushDto(dto, externalDbContext, onDatabaseValidation, beforeCommit));
+
+            _mutex.ReleaseMutex(); // other threads could work now
+
+            return pushResult;
+        }
         
 
         #endregion
@@ -356,24 +433,40 @@ namespace Ant0nRocket.Lib.Dodb
             else
             {
                 FileSystemUtils.TouchDirectory(syncDocumentsDirectoryPath); // just to sure
+
+                _mutex.WaitOne();
+                OnSyncDocumentsStarted?.Invoke(null, EventArgs.Empty);
+
                 PerformSyncDocumentsIteration(syncDocumentsDirectoryPath);
+
+                _mutex.ReleaseMutex();
+                OnSyncDocumentsFinished?.Invoke(null, EventArgs.Empty);
             }
         }
 
         private static void PerformSyncDocumentsIteration(string syncDocumentsDirectoryPath)
         {
-            var exportFromDate = ScanSyncDocumentsDirectoryMinExportDate(syncDocumentsDirectoryPath);
-            var knownDocumentIds = GetKnownDocumentIds(exportFromDate);
-            var exportedDocumentsIdAndPathDict = GetExportedDocumentsIdAndPathDict(syncDocumentsDirectoryPath);
+            var exportFromDate = Stage1_ScanSyncDocumentsDirectoryMinExportDate(syncDocumentsDirectoryPath);
+            OnStage1_Complete?.Invoke(null, exportFromDate);
 
-            var documentIdsToExportList = GetDocumentIdsToExportList(knownDocumentIds, exportedDocumentsIdAndPathDict);
+            var knownDocumentIds = Stage2_GetKnownDocumentIds(exportFromDate);
+            OnStage2_Complete?.Invoke(null, knownDocumentIds.Count);
 
-            var documentIdAndPathToImportDict = GetDocumentIdAndPathToImportDict(
+            var exportedDocumentsIdAndPathDict = Stage3_GetExportedDocumentsIdAndPathDict(syncDocumentsDirectoryPath);
+            OnStage3_Complete?.Invoke(null, exportedDocumentsIdAndPathDict.Count);
+
+            var documentIdsToExportList = Stage4_GetDocumentIdsToExportList(knownDocumentIds, exportedDocumentsIdAndPathDict);
+            OnStage4_Complete?.Invoke(null, documentIdsToExportList.Count());
+
+            var documentIdAndPathToImportDict = Stage5_GetDocumentIdAndPathToImportDict(
                 knownDocumentIds,
                 exportedDocumentsIdAndPathDict);
 
-            ExportDocuments(documentIdsToExportList, syncDocumentsDirectoryPath);
-            ImportDocuments(documentIdAndPathToImportDict);
+            OnStage6_Started?.Invoke(null, EventArgs.Empty);
+            Stage6_ExportDocuments(documentIdsToExportList, syncDocumentsDirectoryPath);
+
+            OnStage7_Started?.Invoke(null, EventArgs.Empty);
+            Stafe7_ImportDocuments(documentIdAndPathToImportDict);
         }
 
         /// <summary>
@@ -388,7 +481,7 @@ namespace Ant0nRocket.Lib.Dodb
         /// Library will decide that all documents from the begining of time till 29th Aug 2022 are
         /// packed inside archives and will skip documents with less DateCreatedUtc then found date.
         /// </summary>
-        private static DateTime ScanSyncDocumentsDirectoryMinExportDate(string syncDocumentsDirectoryPath)
+        private static DateTime Stage1_ScanSyncDocumentsDirectoryMinExportDate(string syncDocumentsDirectoryPath)
         {
             const string FILENAME_PATTERN =
                 @"(?<YearTo>\d{4})(?<MonthTo>\d{2})(?<DayTo>\d{2})\.(zip|7z)";
@@ -416,9 +509,6 @@ namespace Ant0nRocket.Lib.Dodb
                     if (tempDate > latestFoundArchiveDate)
                     {
                         latestFoundArchiveDate = tempDate;
-#if DEBUG
-                        logger.LogDebug($"Archive till '{tempDate}' found.");
-#endif
                     }
 
                 }
@@ -430,9 +520,9 @@ namespace Ant0nRocket.Lib.Dodb
         /// <summary>
         /// Returnes a HashSet of Id of Documents which are known from <paramref name="fromDate"/>.<br />
         /// <paramref name="fromDate"/> could be calculated by function 
-        /// <see cref="ScanSyncDocumentsDirectoryMinExportDate"/>.
+        /// <see cref="Stage1_ScanSyncDocumentsDirectoryMinExportDate"/>.
         /// </summary>
-        private static HashSet<Guid> GetKnownDocumentIds(DateTime fromDate)
+        private static HashSet<Guid> Stage2_GetKnownDocumentIds(DateTime fromDate)
         {
             using var dbContext = GetDbContext();
             return dbContext
@@ -448,7 +538,7 @@ namespace Ant0nRocket.Lib.Dodb
         /// Scans a <paramref name="syncDocumentsDirectoryPath"/> and returnes a dictionary
         /// where key is a Document.Id (Guid) and value is a full path to file.
         /// </summary>
-        private static Dictionary<Guid, string> GetExportedDocumentsIdAndPathDict(string syncDocumentsDirectoryPath)
+        private static Dictionary<Guid, string> Stage3_GetExportedDocumentsIdAndPathDict(string syncDocumentsDirectoryPath)
         {
             const string FILENAME_PATTERN = @"(?<Tickes>\d{18,})_(?<Type>[A-Za-z]+)_" +
                 @"(?<DocumentId>[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})";
@@ -470,10 +560,10 @@ namespace Ant0nRocket.Lib.Dodb
 
         /// <summary>
         /// Returnes a list of Document IDs which are need to be exported.<br />
-        /// <paramref name="knownDocumentIds"/> - from <see cref="GetKnownDocumentIds(DateTime)"/><br />
-        /// <paramref name="exportedDocumentsIdAndPathDict"/> - from <see cref="GetExportedDocumentsIdAndPathDict(string)"/>
+        /// <paramref name="knownDocumentIds"/> - from <see cref="Stage2_GetKnownDocumentIds(DateTime)"/><br />
+        /// <paramref name="exportedDocumentsIdAndPathDict"/> - from <see cref="Stage3_GetExportedDocumentsIdAndPathDict(string)"/>
         /// </summary>
-        private static IEnumerable<Guid> GetDocumentIdsToExportList(
+        private static IEnumerable<Guid> Stage4_GetDocumentIdsToExportList(
             HashSet<Guid> knownDocumentIds,
             Dictionary<Guid, string> exportedDocumentsIdAndPathDict)
         {
@@ -484,9 +574,9 @@ namespace Ant0nRocket.Lib.Dodb
 
         /// <summary>
         /// Returnes a dictionary (Id, Path) of documents which are need to be imported.
-        /// <paramref name="knownDocumentIds"/> - from <see cref="GetKnownDocumentIds(DateTime)"/><br />
+        /// <paramref name="knownDocumentIds"/> - from <see cref="Stage2_GetKnownDocumentIds(DateTime)"/><br />
         /// </summary>
-        private static IDictionary<Guid, string> GetDocumentIdAndPathToImportDict(
+        private static IDictionary<Guid, string> Stage5_GetDocumentIdAndPathToImportDict(
             HashSet<Guid> knownDocumentIds,
             Dictionary<Guid, string> exportedDocumentsIdAndPathDict)
         {
@@ -499,7 +589,7 @@ namespace Ant0nRocket.Lib.Dodb
         /// Retreives documents from <paramref name="documentIdsToExportList"/> and exports them
         /// into directory <paramref name="syncDocumentsDirectoryPath"/>.
         /// </summary>
-        private static void ExportDocuments(IEnumerable<Guid> documentIdsToExportList, string syncDocumentsDirectoryPath)
+        private static void Stage6_ExportDocuments(IEnumerable<Guid> documentIdsToExportList, string syncDocumentsDirectoryPath)
         {
             using var dbContext = GetDbContext();
 
@@ -528,15 +618,14 @@ namespace Ant0nRocket.Lib.Dodb
                 var resultPath = Path.Combine(syncDocumentsDirectoryWithSubFolderPath, shortFileName);
 
                 File.WriteAllText(resultPath, documentJsonValue);
-
-                logger.LogTrace($"Document '{document.Id}' exported to '{resultPath}'");
+                OnStage6_WorkUnitDone?.Invoke(null, documentId);
             }
         }
 
         /// <summary>
         /// Peformes import of documents specified in <paramref name="documentIdAndPathToImportDict"/>.
         /// </summary>
-        private static void ImportDocuments(IDictionary<Guid, string> documentIdAndPathToImportDict)
+        private static void Stafe7_ImportDocuments(IDictionary<Guid, string> documentIdAndPathToImportDict)
         {
             foreach (var kvp in documentIdAndPathToImportDict)
             {
@@ -563,13 +652,18 @@ namespace Ant0nRocket.Lib.Dodb
                     Payload = FileSystemUtils.GetSerializer().Deserialize(document.DocumentPayload.PayloadJson!, payloadType),
                 };
 
-                var pushResult = PushDto(dto);
+                var pushResult = PushDto(dto); // we are in our thread, mutex locked, so it's ok
 
                 if (pushResult.IsSuccess())
-                    logger.LogInformation($"Document '{dto.Id}' imported");
+                {
+                    OnStage7_WorkUnitDone?.Invoke(null, dto.Id);
+                }
                 else
+                {
                     logger.LogError($"Unable to import document from file '{kvp.Value}': " +
                         $"got '{pushResult.GetType().Name}' ({pushResult.AsJson()})");
+                    OnStage7_WorkUnitFailed?.Invoke(null, pushResult);
+                }
             }
         }
 
