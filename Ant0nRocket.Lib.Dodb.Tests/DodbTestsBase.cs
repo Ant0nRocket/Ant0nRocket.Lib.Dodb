@@ -43,7 +43,5 @@ namespace Ant0nRocket.Lib.Dodb.Tests
 
         protected static DtoOf<T> CreateDto<T>(Guid? userId = default) where T : class, new() =>
             Dodb.CreateDto<T>(userId);
-
-        protected IGatewayResponse Push(DtoBase dto) => Dodb.PushDto(dto);
     }
 }

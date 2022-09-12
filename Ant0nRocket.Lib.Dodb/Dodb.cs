@@ -84,7 +84,7 @@ namespace Ant0nRocket.Lib.Dodb
         /// <summary>
         /// Stage 6 is actual exporting of documents.
         /// </summary>
-        public static event EventHandler OnStage6_Started;
+        public static event EventHandler? OnStage6_Started;
 
         /// <summary>
         /// When document exported.
@@ -94,7 +94,7 @@ namespace Ant0nRocket.Lib.Dodb
         /// <summary>
         /// Stage 7 is actual importing of documents.
         /// </summary>
-        public static event EventHandler OnStage7_Started;
+        public static event EventHandler? OnStage7_Started;
 
         /// <summary>
         /// When document imported.
@@ -251,7 +251,6 @@ namespace Ant0nRocket.Lib.Dodb
         /// If <paramref name="externalDbContext"/> passed then all transaction control, saving, disposing - is not 
         /// a business of current function. If you need just push DTO and commit it - dont set <paramref name="externalDbContext"/>!
         /// </summary>
-        [Obsolete("Avoid using it directly! Other threads could work, make sure you are right! Use")]
         public static IGatewayResponse PushDto(
             DtoBase dto,
             DodbContextBase? externalDbContext = default,
@@ -322,11 +321,13 @@ namespace Ant0nRocket.Lib.Dodb
             //using var transaction = externalDbContext == default ? dbContext.Database.BeginTransaction() : null;
 
             // ... and when transaction starter (or not :)) - push dto deeper.
+            _mutex.WaitOne();
             var pushResult = PushDtoObject(dto, dbContext);
 
             if (pushResult.IsSuccess() == false)
             {
                 logger.LogError($"Got {pushResult.GetType().Name} for DTO '{dto.Id}': {pushResult.AsJson()}");
+                _mutex.ReleaseMutex();
                 return pushResult;
             }
 
@@ -362,6 +363,8 @@ namespace Ant0nRocket.Lib.Dodb
 
             #endregion
 
+            _mutex.ReleaseMutex();
+
             return pushResult;
         }
 
@@ -372,12 +375,8 @@ namespace Ant0nRocket.Lib.Dodb
             Func<DtoBase, DodbContextBase, bool>? onDatabaseValidation = null,
             Action<DtoBase, DodbContextBase>? beforeCommit = null)
         {
-            _mutex.WaitOne(); // thread will stop here if mutex is busy
-
             var pushResult = await Task
-                .Run(() => PushDto(dto, externalDbContext, onDatabaseValidation, beforeCommit));
-
-            _mutex.ReleaseMutex(); // other threads could work now
+                .Run(() => PushDto(dto, externalDbContext));
 
             return pushResult;
         }
@@ -614,7 +613,7 @@ namespace Ant0nRocket.Lib.Dodb
                     return;
                 }
 
-                var shortFileName = $"{document.DateCreatedUtc.Ticks}_{document.DocumentPayload.PayloadTypeName!.FromLatest('.')}_{document.Id}.json";
+                var shortFileName = $"{document.DateCreatedUtc.Ticks}_{document.DocumentPayload!.PayloadTypeName!.FromLatest('.')}_{document.Id}.json";
                 var resultPath = Path.Combine(syncDocumentsDirectoryWithSubFolderPath, shortFileName);
 
                 File.WriteAllText(resultPath, documentJsonValue);
@@ -636,7 +635,7 @@ namespace Ant0nRocket.Lib.Dodb
                     continue;
                 }
 
-                var payloadType = ReflectionUtils.FindTypeAccrossAppDomain(document.DocumentPayload.PayloadTypeName!);
+                var payloadType = ReflectionUtils.FindTypeAccrossAppDomain(document.DocumentPayload!.PayloadTypeName!);
                 if (payloadType == null)
                 {
                     logger.LogError($"Type '{document.DocumentPayload.PayloadTypeName}' from '{document.Id}' doesn't exists in current app domain");
@@ -652,7 +651,11 @@ namespace Ant0nRocket.Lib.Dodb
                     Payload = FileSystemUtils.GetSerializer().Deserialize(document.DocumentPayload.PayloadJson!, payloadType),
                 };
 
+#pragma warning disable CS0618 // Type or member is obsolete
+
                 var pushResult = PushDto(dto); // we are in our thread, mutex locked, so it's ok
+
+#pragma warning restore CS0618 // Type or member is obsolete
 
                 if (pushResult.IsSuccess())
                 {

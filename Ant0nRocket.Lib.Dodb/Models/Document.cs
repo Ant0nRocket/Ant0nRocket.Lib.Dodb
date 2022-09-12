@@ -31,8 +31,14 @@ namespace Ant0nRocket.Lib.Dodb.Models
         [JsonIgnore]
         public Document? RequiredDocument { get; set; }
 
-        public DocumentPayload DocumentPayload { get; set; }
+        /// <summary>
+        /// Navigation property for <see cref="DocumentPayload"/>.
+        /// </summary>
+        public DocumentPayload? DocumentPayload { get; set; }
 
+        /// <summary>
+        /// Foreign key for <see cref="DocumentPayload"/>.
+        /// </summary>
         public Guid DocumentPayloadId { get; set; }
 
         /// <summary>
