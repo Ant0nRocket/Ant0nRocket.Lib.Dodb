@@ -11,12 +11,12 @@ namespace Ant0nRocket.Lib.Dodb.Models
         /// <see cref="Type.FullName"/> of a DTO payload class.
         /// </summary>
         [Required]
-        public string? PayloadTypeName { get; set; }
+        public virtual string? PayloadTypeName { get; set; }
 
         /// <summary>
         /// JSON representation of a DTO.
         /// </summary>
         [Required]
-        public string? PayloadJson { get; set; }
+        public virtual string? PayloadJson { get; set; }
     }
 }

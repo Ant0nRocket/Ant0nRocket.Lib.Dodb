@@ -14,18 +14,18 @@ namespace Ant0nRocket.Lib.Dodb.Models
         /// Id of entity
         /// </summary>
         [Key]
-        public Guid Id { get; set; } = Guid.NewGuid();
+        public virtual Guid Id { get; set; } = Guid.NewGuid();
 
         /// <summary>
         /// Id of document that created a record.
         /// </summary>
         [ForeignKey("Document")]
-        public Guid DocumentRefId { get; set; }
+        public virtual Guid DocumentRefId { get; set; }
 
         /// <summary>
         /// Document that created entity/record.
         /// </summary>
         [JsonIgnore]
-        public Document? Document { get; set; }
+        public virtual Document? Document { get; set; }
     }
 }

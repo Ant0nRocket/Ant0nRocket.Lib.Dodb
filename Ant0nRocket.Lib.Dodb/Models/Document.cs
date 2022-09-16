@@ -18,34 +18,34 @@ namespace Ant0nRocket.Lib.Dodb.Models
         /// Id of a Document.
         /// </summary>
         [Key]
-        public Guid Id { get; set; }
+        public virtual Guid Id { get; set; }
 
         /// <summary>
         /// Library automatically controls that every Document (except first one)
         /// could be applyed only when required Document exists in database.<br />
         /// Something like block-chain, but without encryption.
         /// </summary>
-        public Guid? RequiredDocumentId { get; set; }
+        public virtual Guid? RequiredDocumentId { get; set; }
 
         /// <inheritdoc cref="RequiredDocumentId"/>
         [JsonIgnore]
-        public Document? RequiredDocument { get; set; }
+        public virtual Document? RequiredDocument { get; set; }
 
         /// <summary>
         /// Navigation property for <see cref="DocumentPayload"/>.
         /// </summary>
-        public DocumentPayload? DocumentPayload { get; set; }
+        public virtual DocumentPayload? DocumentPayload { get; set; }
 
         /// <summary>
         /// Foreign key for <see cref="DocumentPayload"/>.
         /// </summary>
-        public Guid DocumentPayloadId { get; set; }
+        public virtual Guid DocumentPayloadId { get; set; }
 
         /// <summary>
         /// Timestamp (UTC).
         /// </summary>
         [Required]
-        public DateTime DateCreatedUtc { get; set; }
+        public virtual DateTime DateCreatedUtc { get; set; }
 
         /************************************************************************
          * COLLECTION OF PROPERTIES THAT COULD BE USEFULL IF YOU NEED THEM.
@@ -55,6 +55,6 @@ namespace Ant0nRocket.Lib.Dodb.Models
         /// <summary>
         /// Posible Id of an author of the document.
         /// </summary>
-        public Guid? UserId { get; set; }
+        public virtual Guid? UserId { get; set; }
     }
 }
