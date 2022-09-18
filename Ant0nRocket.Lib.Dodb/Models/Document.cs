@@ -48,6 +48,11 @@ namespace Ant0nRocket.Lib.Dodb.Models
         public string? PayloadTypeName { get; set; }
 
         /// <summary>
+        /// Short? annotation about the purpose of a document.
+        /// </summary>
+        public string? Description { get; set; }
+
+        /// <summary>
         /// Timestamp (UTC).
         /// </summary>
         [Required]
