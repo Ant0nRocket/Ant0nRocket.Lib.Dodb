@@ -217,24 +217,17 @@ namespace Ant0nRocket.Lib.Dodb
                 TryHandleDtoPayloadExternally(dtoPayload, dbContext) ??
                 new GrDtoPayloadHandlerNotFound();
 
-            var documentPayload = new DocumentPayload
-            {
-                DocumentRefId = dto.Id,
-                PayloadJson = dtoPayload.AsJson(pretty: false),
-            };
-
             var document = new Document
             {
                 Id = dto.Id,
                 UserId = dto.UserId,
                 RequiredDocumentId = dto.RequiredDocumentId,
                 DateCreatedUtc = dto.DateCreatedUtc,
-                DocumentPayloadId = documentPayload.Id,
+                PayloadJson = dtoPayload.AsJson(pretty: false),
                 PayloadTypeName = dtoPayload.GetType().FullName,
             };
 
             dbContext.Documents.Add(document);
-            dbContext.DocumentPayloads.Add(documentPayload);
             return dtoHandleResponse;
         }
 
@@ -599,7 +592,6 @@ namespace Ant0nRocket.Lib.Dodb
                     .Documents
                     .AsNoTracking()
                     .Where(d => d.Id == documentId)
-                    .Include(d => d.DocumentPayload)
                     .First(); // we are sure it exists
 
                 var documentJsonValue = document.AsJson();
@@ -649,7 +641,7 @@ namespace Ant0nRocket.Lib.Dodb
                     UserId = document.UserId,
                     RequiredDocumentId = document.RequiredDocumentId,
                     DateCreatedUtc = document.DateCreatedUtc,
-                    Payload = FileSystemUtils.GetSerializer().Deserialize(document.DocumentPayload!.PayloadJson!, payloadType),
+                    Payload = FileSystemUtils.GetSerializer().Deserialize(document.PayloadJson!, payloadType),
                 };
 
                 var pushResult = PushDto(dto); // we are in our thread, mutex locked, so it's ok

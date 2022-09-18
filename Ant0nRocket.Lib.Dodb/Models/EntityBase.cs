@@ -20,7 +20,7 @@ namespace Ant0nRocket.Lib.Dodb.Models
         /// Id of document that created a record.
         /// </summary>
         [ForeignKey("Document")]
-        public Guid DocumentRefId { get; set; }
+        public virtual Guid DocumentRefId { get; set; }
 
         /// <summary>
         /// Document that created entity/record.

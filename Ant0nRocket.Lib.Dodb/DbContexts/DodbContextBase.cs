@@ -14,11 +14,6 @@ namespace Ant0nRocket.Lib.Dodb.DbContexts
         /// </summary>
         public DbSet<Document> Documents { get; set; }
 
-        /// <summary>
-        /// All known payload types of AppDomain.
-        /// </summary>
-        public DbSet<DocumentPayload> DocumentPayloads { get; set;}
-
         /// <inheritdoc />
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

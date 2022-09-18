@@ -6,7 +6,7 @@ namespace Ant0nRocket.Lib.Dodb.Dto.Payloads.DataAnnotations
     public class ValidateEachElementAttribute : ValidationAttribute
     {
         protected readonly List<ValidationResult> validationResults = new List<ValidationResult>();
-        public override bool IsValid(object value)
+        public override bool IsValid(object? value)
         {
             var list = value as IEnumerable;
             if (list == null) return true;

@@ -32,14 +32,10 @@ namespace Ant0nRocket.Lib.Dodb.Models
         public Document? RequiredDocument { get; set; }
 
         /// <summary>
-        /// Navigation property for <see cref="DocumentPayload"/>.
+        /// JSON representation of a DTO.
         /// </summary>
-        public DocumentPayload? DocumentPayload { get; set; }
-
-        /// <summary>
-        /// Foreign key for <see cref="DocumentPayload"/>.
-        /// </summary>
-        public Guid DocumentPayloadId { get; set; }
+        [Required]
+        public string? PayloadJson { get; set; }
 
         /// <summary>
         /// <see cref="Type.FullName"/> of a DTO payload class.
