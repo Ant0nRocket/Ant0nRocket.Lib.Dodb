@@ -22,7 +22,7 @@ namespace Ant0nRocket.Lib.Dodb.DbContexts
         /// <inheritdoc />
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            modelBuilder.Entity<DocumentPayload>().HasIndex(p => p.PayloadTypeName).IsUnique(false);
+            modelBuilder.Entity<Document>().HasIndex(p => p.PayloadTypeName).IsUnique(false);
         }
     }
 }

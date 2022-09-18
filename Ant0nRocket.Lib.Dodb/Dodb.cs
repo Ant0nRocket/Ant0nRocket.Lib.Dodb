@@ -220,7 +220,6 @@ namespace Ant0nRocket.Lib.Dodb
             var documentPayload = new DocumentPayload
             {
                 DocumentRefId = dto.Id,
-                PayloadTypeName = dtoPayload.GetType().FullName,
                 PayloadJson = dtoPayload.AsJson(pretty: false),
             };
 
@@ -231,6 +230,7 @@ namespace Ant0nRocket.Lib.Dodb
                 RequiredDocumentId = dto.RequiredDocumentId,
                 DateCreatedUtc = dto.DateCreatedUtc,
                 DocumentPayloadId = documentPayload.Id,
+                PayloadTypeName = dtoPayload.GetType().FullName,
             };
 
             dbContext.Documents.Add(document);
@@ -460,6 +460,7 @@ namespace Ant0nRocket.Lib.Dodb
             var documentIdAndPathToImportDict = Stage5_GetDocumentIdAndPathToImportDict(
                 knownDocumentIds,
                 exportedDocumentsIdAndPathDict);
+            OnStage5_Complete?.Invoke(null, documentIdAndPathToImportDict.Count);
 
             OnStage6_Started?.Invoke(null, EventArgs.Empty);
             Stage6_ExportDocuments(documentIdsToExportList, syncDocumentsDirectoryPath);
@@ -613,7 +614,7 @@ namespace Ant0nRocket.Lib.Dodb
                     return;
                 }
 
-                var shortFileName = $"{document.DateCreatedUtc.Ticks}_{document.DocumentPayload!.PayloadTypeName!.FromLatest('.')}_{document.Id}.json";
+                var shortFileName = $"{document.DateCreatedUtc.Ticks}_{document.PayloadTypeName!.FromLatest('.')}_{document.Id}.json";
                 var resultPath = Path.Combine(syncDocumentsDirectoryWithSubFolderPath, shortFileName);
 
                 File.WriteAllText(resultPath, documentJsonValue);
@@ -635,10 +636,10 @@ namespace Ant0nRocket.Lib.Dodb
                     continue;
                 }
 
-                var payloadType = ReflectionUtils.FindTypeAccrossAppDomain(document.DocumentPayload!.PayloadTypeName!);
+                var payloadType = ReflectionUtils.FindTypeAccrossAppDomain(document.PayloadTypeName!);
                 if (payloadType == null)
                 {
-                    logger.LogError($"Type '{document.DocumentPayload.PayloadTypeName}' from '{document.Id}' doesn't exists in current app domain");
+                    logger.LogError($"Type '{document.PayloadTypeName}' from '{document.Id}' doesn't exists in current app domain");
                     continue;
                 }
 
@@ -648,14 +649,10 @@ namespace Ant0nRocket.Lib.Dodb
                     UserId = document.UserId,
                     RequiredDocumentId = document.RequiredDocumentId,
                     DateCreatedUtc = document.DateCreatedUtc,
-                    Payload = FileSystemUtils.GetSerializer().Deserialize(document.DocumentPayload.PayloadJson!, payloadType),
+                    Payload = FileSystemUtils.GetSerializer().Deserialize(document.DocumentPayload!.PayloadJson!, payloadType),
                 };
 
-#pragma warning disable CS0618 // Type or member is obsolete
-
                 var pushResult = PushDto(dto); // we are in our thread, mutex locked, so it's ok
-
-#pragma warning restore CS0618 // Type or member is obsolete
 
                 if (pushResult.IsSuccess())
                 {
