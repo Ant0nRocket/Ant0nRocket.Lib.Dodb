@@ -35,8 +35,17 @@ namespace Ant0nRocket.Lib.Dodb.Serialization
             try
             {
                 var instance = Newtonsoft.Json.JsonConvert.DeserializeObject(contents, type);
-                if (instance == null && throwExceptions)
-                    throw new InvalidOperationException("Can't deserialize string");
+                if (instance == null)
+                {
+                    if (throwExceptions)
+                    {
+                        throw new InvalidOperationException("Can't deserialize string");
+                    }
+                }
+                else
+                {
+                    return instance;
+                }
             }
             catch (Exception ex)
             {
