@@ -37,7 +37,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
                 PldCreateUser p => UsersService.CreateUser(p, c),
                 AnnotatedPayload => new GrOk(),
                 ListPayload => new GrOk(),
-                _ => new GrDtoPayloadHandlerNotFound { DtoPayloadTypeName = $"{dtoPayloadObject.GetType()}" }
+                _ => new GrDtoPushFailed { Reason = Enums.GrPushFailReason.PayloadHandlerNotFound }
             };
         }
 

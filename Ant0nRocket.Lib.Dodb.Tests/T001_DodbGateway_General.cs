@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 
 using Ant0nRocket.Lib.Dodb.Dto;
+using Ant0nRocket.Lib.Dodb.Enums;
 using Ant0nRocket.Lib.Dodb.Gateway.Responses;
 using Ant0nRocket.Lib.Dodb.Tests.Contexts;
 using Ant0nRocket.Lib.Dodb.Tests.Dto.Payloads.Mock;
@@ -24,7 +25,10 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         {
             var dto = new DtoOf<NotHandledPayload>() { UserId = Guid.NewGuid() };
             var result = Dodb.PushDto(dto);
-            result.AssertIs<GrDtoPayloadHandlerNotFound>();
+
+            result
+                .AssertIs<GrDtoPushFailed>()
+                .AssertFailReasonIs(GrPushFailReason.PayloadHandlerNotFound);
         }
 
         [Test]
@@ -42,7 +46,9 @@ namespace Ant0nRocket.Lib.Dodb.Tests
 
             var result = Dodb.PushDto(dto);
 
-            Assert.AreEqual(2, result.AssertIs<GrDtoValidationFailed>().Errors.Count);
+            result
+                .AssertIs<GrDtoPushFailed>()
+                .AssertFailReasonIs(GrPushFailReason.ValidationFailed);
         }
 
         [Test]
@@ -57,7 +63,9 @@ namespace Ant0nRocket.Lib.Dodb.Tests
 
             var result = Dodb.PushDto(dto);
 
-            Assert.AreEqual(1, result.AssertIs<GrDtoValidationFailed>().Errors.Count);
+            result
+                .AssertIs<GrDtoPushFailed>()
+                .AssertFailReasonIs(GrPushFailReason.ValidationFailed);
         }
 
         [Test]
@@ -65,7 +73,9 @@ namespace Ant0nRocket.Lib.Dodb.Tests
         {
             var dto = Dodb.CreateDto<ListPayload>();
             var pushResult = Dodb.PushDto(dto);
-            pushResult.AssertIs<GrDtoValidationFailed>(); // no items added
+            pushResult
+                .AssertIs<GrDtoPushFailed>()
+                .AssertFailReasonIs(GrPushFailReason.ValidationFailed); // no items added
 
             // Valid
             dto.Payload.Items.Add(new() { SomeIntValue = 10, SomeStringValue = "12" });
@@ -76,14 +86,18 @@ namespace Ant0nRocket.Lib.Dodb.Tests
             dto.Payload.Items.Clear();
             dto.Payload.Items.Add(new() { SomeIntValue = -10, SomeStringValue = "12" }); // -10 is invalid
             pushResult = Dodb.PushDto(dto);
-            Assert.That(pushResult is GrDtoValidationFailed);
+            pushResult
+                .AssertIs<GrDtoPushFailed>()
+                .AssertFailReasonIs(GrPushFailReason.ValidationFailed);
 
             // Invalid + valid = invalid
             dto.Payload.Items.Clear();
             dto.Payload.Items.Add(new() { SomeIntValue = 10, SomeStringValue = "12" }); // valid
             dto.Payload.Items.Add(new() { SomeIntValue = -10, SomeStringValue = "12" }); // valid
             pushResult = Dodb.PushDto(dto);
-            Assert.That(pushResult is GrDtoValidationFailed);
+            pushResult
+                .AssertIs<GrDtoPushFailed>()
+                .AssertFailReasonIs(GrPushFailReason.ValidationFailed);
         }
 
         

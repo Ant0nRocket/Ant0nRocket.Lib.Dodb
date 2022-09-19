@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using Ant0nRocket.Lib.Dodb.DbContexts;
 using Ant0nRocket.Lib.Dodb.Dto;
 using Ant0nRocket.Lib.Dodb.Dto.Payloads.Abstractions;
+using Ant0nRocket.Lib.Dodb.Enums;
 using Ant0nRocket.Lib.Dodb.Extensions;
 using Ant0nRocket.Lib.Dodb.Gateway;
 using Ant0nRocket.Lib.Dodb.Gateway.Abstractions;
@@ -173,7 +174,8 @@ namespace Ant0nRocket.Lib.Dodb
             GetDbContextHandler getDbContextHandler,
             DtoPayloadHandler dtoPayloadHandler)
         {
-            if (_isInitialized) return;
+            if (_isInitialized)
+                return;
 
             Ant0nRocketLibConfig.RegisterJsonSerializer(new NewtonsoftJsonSerializer());
 
@@ -187,15 +189,6 @@ namespace Ant0nRocket.Lib.Dodb
         #endregion
 
         #region DTO handling
-
-        private static IGatewayResponse? TryHandleDtoPayloadInternally(object dtoPayload, DodbContextBase dbContext)
-        {
-            var c = dbContext;
-            return dtoPayload switch
-            {
-                _ => null
-            };
-        }
 
         private static IGatewayResponse? TryHandleDtoPayloadExternally(object dtoPayload, DodbContextBase dbContext)
         {
@@ -217,9 +210,8 @@ namespace Ant0nRocket.Lib.Dodb
                 throw new InvalidDataException("Can't get a value of Dto.Payload");
 
             var dtoHandleResponse = // first, try internal handler, then try external handler, or drop no handler found
-                TryHandleDtoPayloadInternally(dtoPayload, dbContext) ??
                 TryHandleDtoPayloadExternally(dtoPayload, dbContext) ??
-                new GrDtoPayloadHandlerNotFound();
+                new GrDtoPushFailed { Reason = GrPushFailReason.PayloadHandlerNotFound, Dto = dto };
 
             var document = new Document
             {
@@ -238,13 +230,9 @@ namespace Ant0nRocket.Lib.Dodb
 
         /// <summary>
         /// 1. Throws <see cref="ApplicationException"/> if library wasn't initialized (see <see cref="Initialize(GetDbContextHandler, DtoPayloadHandler)"/>.<br />
-        /// 2. Returnes <see cref="GrDtoValidationFailed"/> if there are some validation errors in DTO or its payload.<br />
-        /// 4. Returnes <see cref="GrDtoDocumentExists"/> if any document with <paramref name="dto"/>.Id already exists.<br />
-        /// 5. Returnes <see cref="GrDtoRequiredDocumentNotFound"/> if there is some document required to exist but not found.<br />
-        /// 6. Returnes <see cref="GrDtoPayloadHandlerNotFound"/> if there is no handler found for payload.<br />
-        /// 7. Returnes <see cref="GrDtoPushFailed"/> if there some errors durring commit.<br />
+        /// 2. Returnes <see cref="GrDtoPushFailed"/> if there some errors durring commit.<br />
         /// <br />
-        /// Othervise returnes some <see cref="IGatewayResponse"/><br />
+        /// Othervise returnes some <see cref="GrDtoPushSuccess"/><br />
         /// ------------------------<br />
         /// If <paramref name="externalDbContext"/> passed then all transaction control, saving, disposing - is not 
         /// a business of current function. If you need just push DTO and commit it - dont set <paramref name="externalDbContext"/>!
@@ -255,15 +243,21 @@ namespace Ant0nRocket.Lib.Dodb
             Func<DtoBase, DodbContextBase, bool>? onDatabaseValidation = null,
             Action<DtoBase, DodbContextBase>? beforeCommit = null)
         {
-            if (!_isInitialized) throw new ApplicationException(ERROR_NOT_INITIALIZED);
+            if (!_isInitialized)
+                throw new ApplicationException(ERROR_NOT_INITIALIZED);
 
             #region Basic validation (will check properties according to annotations)
 
             var validator = new DtoValidator(dto).Validate();
             if (validator.ValidationResults.Count > 0)
             {
-                logger.LogError($"Invalid DTO '{dto.Id}': {string.Join(", ", validator.ErrorsList)}");
-                return new GrDtoValidationFailed(validator.ErrorsList);
+                var response = new GrDtoPushFailed
+                {
+                    Reason = GrPushFailReason.ValidationFailed,
+                    Dto = dto,
+                };
+                validator.ValidationResults.ForEach(r => response.Messages.Add(r.ErrorMessage!));
+                return response;
             }
 
             #endregion
@@ -280,16 +274,18 @@ namespace Ant0nRocket.Lib.Dodb
 
             if (dbContext.Documents.Any(d => d.Id == dto.Id))
             {
-                logger.LogWarning($"Can't apply DTO '{dto.Id}': document with this Id already exists");
-                return new GrDtoDocumentExists { DocumentId = dto.Id };
+                return new GrDtoPushFailed { Reason = GrPushFailReason.DocumentExists, Dto = dto };
             }
 
             if (dto.RequiredDocumentId != null)
             {
                 if (!dbContext.Documents.Any(d => d.Id == dto.RequiredDocumentId))
                 {
-                    logger.LogWarning($"Can't apply DTO '{dto.Id}': required document '{dto.RequiredDocumentId}' doesn't exists");
-                    return new GrDtoRequiredDocumentNotFound { RequesterId = dto.Id, RequiredDocumentId = dto.RequiredDocumentId };
+                    return new GrDtoPushFailed
+                    {
+                        Reason = GrPushFailReason.RequiredDocumentNotExists,
+                        Dto = dto
+                    };
                 }
             }
             else // RequiredDocumentId is NOT specified
@@ -298,18 +294,14 @@ namespace Ant0nRocket.Lib.Dodb
                 // So, if any document exists there should not be a DTO without RequiredDocumentId
                 if (dbContext.Documents.Any())
                 {
-                    var message = $"DTO '{dto.Id}' must have RequiredDocumentId";
-                    logger.LogError(message);
-                    return new GrDtoPushFailed { Message = message };
+                    return new GrDtoPushFailed(dto, "RequiredDocumentId must be specified!");
                 }
             }
 
             var externalDatabaseValidationResult = onDatabaseValidation?.Invoke(dto, dbContext) ?? true;
             if (externalDatabaseValidationResult == false)
             {
-                var message = $"DTO '{dto.Id}' didn't pass database validation";
-                logger.LogError(message);
-                return new GrDtoValidationFailed(message);
+                return new GrDtoPushFailed(dto, "Didn't pass database validation");
             }
 
             #endregion
@@ -347,8 +339,7 @@ namespace Ant0nRocket.Lib.Dodb
                 catch (Exception ex)
                 {
                     var message = $"{ex.Message} " + ex.InnerException?.Message ?? string.Empty;
-                    pushResult = new GrDtoPushFailed { Message = message };
-                    logger.LogException(ex, $"DTO '{dto.Id}'");
+                    pushResult = new GrDtoPushFailed(dto, message, GrPushFailReason.DatabaseError);
                 }
                 finally
                 {
@@ -378,7 +369,7 @@ namespace Ant0nRocket.Lib.Dodb
 
             return pushResult;
         }
-        
+
 
         #endregion
 
@@ -392,7 +383,8 @@ namespace Ant0nRocket.Lib.Dodb
         /// </summary>
         public static DtoOf<T> CreateDto<T>(Guid? userId = default) where T : class, new()
         {
-            if (!_isInitialized) throw new ApplicationException(ERROR_NOT_INITIALIZED);
+            if (!_isInitialized)
+                throw new ApplicationException(ERROR_NOT_INITIALIZED);
 
             var result = new DtoOf<T>(userId);
 
@@ -648,8 +640,8 @@ namespace Ant0nRocket.Lib.Dodb
                     Description = document.Description,
                     DateCreatedUtc = document.DateCreatedUtc,
                     Payload = Ant0nRocketLibConfig.GetJsonSerializer().Deserialize(
-                        contents: document.PayloadJson!, 
-                        type: payloadType!, 
+                        contents: document.PayloadJson!,
+                        type: payloadType!,
                         throwExceptions: true),
                 };
 
@@ -682,7 +674,8 @@ namespace Ant0nRocket.Lib.Dodb
         /// </summary>
         public static void RecreateDatabase()
         {
-            if (!_isInitialized) throw new ApplicationException(ERROR_NOT_INITIALIZED);
+            if (!_isInitialized)
+                throw new ApplicationException(ERROR_NOT_INITIALIZED);
 
             using var dbContext = GetDbContext();
             if (dbContext is DbContext ctx)
