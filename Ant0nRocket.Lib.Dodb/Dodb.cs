@@ -223,6 +223,7 @@ namespace Ant0nRocket.Lib.Dodb
                 UserId = dto.UserId,
                 RequiredDocumentId = dto.RequiredDocumentId,
                 DateCreatedUtc = dto.DateCreatedUtc,
+                Description = dto.Description,
                 PayloadJson = dtoPayload.AsJson(pretty: false),
                 PayloadTypeName = dtoPayload.GetType().FullName,
             };
@@ -640,6 +641,7 @@ namespace Ant0nRocket.Lib.Dodb
                     Id = kvp.Key,
                     UserId = document.UserId,
                     RequiredDocumentId = document.RequiredDocumentId,
+                    Description = document.Description,
                     DateCreatedUtc = document.DateCreatedUtc,
                     Payload = FileSystemUtils.GetSerializer().Deserialize(document.PayloadJson!, payloadType),
                 };
