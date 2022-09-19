@@ -4,33 +4,10 @@ namespace Ant0nRocket.Lib.Dodb.Serialization
 {
     internal class NewtonsoftJsonSerializer : IJsonSerializer
     {
-        public T Deserialize<T>(string contents, bool throwExceptions = false) where T : class, new()
-        {
-            try
-            {
-                var instance = Newtonsoft.Json.JsonConvert.DeserializeObject<T>(contents);
-                if (instance == null)
-                {
-                    if (throwExceptions)
-                    {
-                        throw new InvalidOperationException("Can't deserialize string");
-                    }
-                }
-                else
-                {
-                    return instance!;
-                }
-            }
-            catch (Exception ex)
-            {
-                if (throwExceptions)
-                    throw new Exception("See inner exception", ex);
-            }
+        public T Deserialize<T>(string contents, bool throwExceptions = false) where T : class, new() =>
+            (T)Deserialize(contents, typeof(T), throwExceptions);
 
-            return Activator.CreateInstance<T>();
-        }
-
-        public object Deserialize(string contents, Type type, bool throwExceptions)
+        public object Deserialize(string contents, Type type, bool throwExceptions = false)
         {
             try
             {
