@@ -11,6 +11,8 @@ using Ant0nRocket.Lib.Dodb.Gateway.Abstractions;
 using Ant0nRocket.Lib.Dodb.Gateway.Helpers;
 using Ant0nRocket.Lib.Dodb.Gateway.Responses;
 using Ant0nRocket.Lib.Dodb.Models;
+using Ant0nRocket.Lib.Dodb.Serialization;
+using Ant0nRocket.Lib.Std20;
 using Ant0nRocket.Lib.Std20.Cryptography;
 using Ant0nRocket.Lib.Std20.Extensions;
 using Ant0nRocket.Lib.Std20.IO;
@@ -172,6 +174,8 @@ namespace Ant0nRocket.Lib.Dodb
             DtoPayloadHandler dtoPayloadHandler)
         {
             if (_isInitialized) return;
+
+            Ant0nRocketLibConfig.RegisterJsonSerializer(new NewtonsoftJsonSerializer());
 
             _getDbContextHandler = getDbContextHandler ?? throw new NullReferenceException(nameof(getDbContextHandler));
             _dtoPayloadHandler = dtoPayloadHandler ?? throw new NullReferenceException(nameof(dtoPayloadHandler));
@@ -643,7 +647,10 @@ namespace Ant0nRocket.Lib.Dodb
                     RequiredDocumentId = document.RequiredDocumentId,
                     Description = document.Description,
                     DateCreatedUtc = document.DateCreatedUtc,
-                    Payload = FileSystemUtils.GetSerializer().Deserialize(document.PayloadJson!, payloadType),
+                    Payload = Ant0nRocketLibConfig.GetJsonSerializer().Deserialize(
+                        contents: document.PayloadJson!, 
+                        type: payloadType!, 
+                        throwExceptions: true),
                 };
 
                 var pushResult = PushDto(dto); // we are in our thread, mutex locked, so it's ok
