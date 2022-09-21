@@ -1,7 +1,6 @@
 ﻿using Ant0nRocket.Lib.Dodb.Dto;
 using Ant0nRocket.Lib.Dodb.Enums;
 using Ant0nRocket.Lib.Dodb.Gateway.Abstractions;
-using Ant0nRocket.Lib.Dodb.Gateway.Responses.Attributes;
 using Ant0nRocket.Lib.Std20.Extensions;
 
 namespace Ant0nRocket.Lib.Dodb.Gateway.Responses
@@ -9,7 +8,6 @@ namespace Ant0nRocket.Lib.Dodb.Gateway.Responses
     /// <summary>
     /// <see cref="Dodb"/> will return this when something goes wrong.
     /// </summary>
-    [IsSuccess(false)]
     public class GrDtoPushFailed : IGatewayResponse
     {
         /// <summary>

@@ -1,12 +1,7 @@
-﻿using System.Diagnostics;
-using System.Runtime.CompilerServices;
-using System.Text.RegularExpressions;
-
-using Ant0nRocket.Lib.Dodb.DbContexts;
+﻿using Ant0nRocket.Lib.Dodb.DbContexts;
 using Ant0nRocket.Lib.Dodb.Dto;
 using Ant0nRocket.Lib.Dodb.Dto.Payloads.Abstractions;
 using Ant0nRocket.Lib.Dodb.Enums;
-using Ant0nRocket.Lib.Dodb.Extensions;
 using Ant0nRocket.Lib.Dodb.Gateway;
 using Ant0nRocket.Lib.Dodb.Gateway.Abstractions;
 using Ant0nRocket.Lib.Dodb.Gateway.Helpers;
@@ -21,6 +16,8 @@ using Ant0nRocket.Lib.Std20.Logging;
 using Ant0nRocket.Lib.Std20.Reflection;
 
 using Microsoft.EntityFrameworkCore;
+
+using System.Text.RegularExpressions;
 
 namespace Ant0nRocket.Lib.Dodb
 {
@@ -165,7 +162,7 @@ namespace Ant0nRocket.Lib.Dodb
 
         #endregion
 
-        #region Initialization        
+        #region Initialization
 
         /// <summary>
         /// Performes initialization of a library.
@@ -209,7 +206,7 @@ namespace Ant0nRocket.Lib.Dodb
             var dtoPayload = dtoPayloadPropertyInfo.GetValue(dto) ??
                 throw new InvalidDataException("Can't get a value of Dto.Payload");
 
-            var dtoHandleResponse = // first, try internal handler, then try external handler, or drop no handler found
+            var dtoHandleResponse =
                 TryHandleDtoPayloadExternally(dtoPayload, dbContext) ??
                 new GrDtoPushFailed { Reason = GrPushFailReason.PayloadHandlerNotFound, Dto = dto };
 
@@ -229,19 +226,9 @@ namespace Ant0nRocket.Lib.Dodb
         }
 
         /// <summary>
-        /// 1. Throws <see cref="ApplicationException"/> if library wasn't initialized (see <see cref="Initialize(GetDbContextHandler, DtoPayloadHandler)"/>.<br />
-        /// 2. Returnes <see cref="GrDtoPushFailed"/> if there some errors durring commit.<br />
-        /// <br />
-        /// Othervise returnes some <see cref="GrDtoPushSuccess"/><br />
-        /// ------------------------<br />
-        /// If <paramref name="externalDbContext"/> passed then all transaction control, saving, disposing - is not 
-        /// a business of current function. If you need just push DTO and commit it - dont set <paramref name="externalDbContext"/>!
+        /// Performs pushing of a DTO.
         /// </summary>
-        public static IGatewayResponse PushDto(
-            DtoBase dto,
-            DodbContextBase? externalDbContext = default,
-            Func<DtoBase, DodbContextBase, bool>? onDatabaseValidation = null,
-            Action<DtoBase, DodbContextBase>? beforeCommit = null)
+        public static IGatewayResponse PushDto(DtoBase dto)
         {
             if (!_isInitialized)
                 throw new ApplicationException(ERROR_NOT_INITIALIZED);
@@ -262,13 +249,8 @@ namespace Ant0nRocket.Lib.Dodb
 
             #endregion
 
-            // ... ok, basic validation passed, let's go to database and check few more thing.
-            // It's time to create a DbContext here.
-            var dbContext = externalDbContext ?? GetDbContext(); // COULD BE EXTERNAL !!!
-
-            using var transaction = externalDbContext == default ?
-                dbContext.Database.BeginTransaction() : // our context - our transaction
-                null; // external context - no transactions required!
+            using var dbContext = GetDbContext();
+            using var transaction = dbContext.Database.BeginTransaction();
 
             #region Database validations
 
@@ -298,78 +280,57 @@ namespace Ant0nRocket.Lib.Dodb
                 }
             }
 
-            var externalDatabaseValidationResult = onDatabaseValidation?.Invoke(dto, dbContext) ?? true;
-            if (externalDatabaseValidationResult == false)
-            {
-                return new GrDtoPushFailed(dto, "Didn't pass database validation");
-            }
-
             #endregion
 
-            // Alright! All checks done, DTO is ready to be applyied. But what about transaction?
-            // If context is not external - let's start a transaction...
-            //using var transaction = externalDbContext == default ? dbContext.Database.BeginTransaction() : null;
 
-            // ... and when transaction starter (or not :)) - push dto deeper.
-            _mutex.WaitOne();
-            var pushResult = PushDtoObject(dto, dbContext);
-
-            if (pushResult.IsSuccess() == false)
+            try
             {
-                logger.LogError($"Got {pushResult.GetType().Name} for DTO '{dto.Id}': {pushResult.AsJson()}");
-                _mutex.ReleaseMutex();
-                return pushResult;
-            }
+                _mutex.WaitOne(); // Take a mutex (or wait here until busy)
 
-            #region If this function created dbContext then we save and commit...
+                var pushResult = PushDtoObject(dto, dbContext);
 
-            if (externalDbContext == default)
-            {
-                // What is going on here?
-                // Very simple! If 'externalDbContext' is null means that we have create our dbContext
-                // here (in this function). If so - we have a right (duty? :)) to save changes and
-                // dispose what we have done.
-
-                try
+                if (pushResult is GrDtoPushSuccess)
                 {
-                    beforeCommit?.Invoke(dto, dbContext);
                     dbContext.SaveChanges();
                     transaction?.Commit();
+                    logger.LogInformation($"DTO '{dto.Id}' applied to database");
+                    return pushResult;
                 }
-                catch (Exception ex)
+                else if (pushResult is GrDtoPushFailed failedResult)
                 {
-                    var message = $"{ex.Message} " + ex.InnerException?.Message ?? string.Empty;
-                    pushResult = new GrDtoPushFailed(dto, message, GrPushFailReason.DatabaseError);
+                    logger.LogObject(failedResult);
+                    return failedResult;
                 }
-                finally
+                else
                 {
-                    dbContext.Dispose();
+                    var message = $"push result has a type '{pushResult.GetType().Name}':" +
+                        $"app doesn't know ehat to do with it";
+                    logger.LogError(message);
+                    return new GrDtoPushFailed(dto, message)
+                    {
+                        Reason = GrPushFailReason.UnknownResultType
+                    };
                 }
-
-                // ... but If 'externalDbContext' is NOT null then we must not do anything else, let
-                // external owner of the context performs saving, disposing, etc.
             }
-
-            #endregion
-
-            _mutex.ReleaseMutex();
-
-            return pushResult;
+            catch (Exception ex)
+            {
+                var message = ex.GetFullExceptionErrorMessage();
+                logger.LogError(message);
+                return new GrDtoPushFailed(dto, message, GrPushFailReason.DatabaseError);
+            }
+            finally
+            {
+                // Transaction and dbcontext will be disposed automatically.
+                // If transaction were not commited - rollback will be called.
+                _mutex.ReleaseMutex(); // release mutex
+            }
         }
 
-        /// <inheritdoc cref="PushDto(DtoBase, DodbContextBase?, Func{DtoBase, DodbContextBase, bool}?, Action{DtoBase, DodbContextBase}?)"/>
-        public static async Task<IGatewayResponse> PushDtoAsync(
-            DtoBase dto,
-            DodbContextBase? externalDbContext = default,
-            Func<DtoBase, DodbContextBase, bool>? onDatabaseValidation = null,
-            Action<DtoBase, DodbContextBase>? beforeCommit = null)
-        {
-            var pushResult = await Task
-                .Run(() => PushDto(dto, externalDbContext));
-
-            return pushResult;
-        }
-
+        /// <summary>
+        /// <inheritdoc cref="PushDto(DtoBase)" />
+        /// </summary>
+        public static async Task<IGatewayResponse> PushDtoAsync(DtoBase dto) => 
+            await Task.Run(() => PushDto(dto));
 
         #endregion
 
@@ -647,7 +608,7 @@ namespace Ant0nRocket.Lib.Dodb
 
                 var pushResult = PushDto(dto); // we are in our thread, mutex locked, so it's ok
 
-                if (pushResult.IsSuccess())
+                if (pushResult is GrDtoPushSuccess)
                 {
                     OnStage7_WorkUnitDone?.Invoke(null, dto.Id);
                 }

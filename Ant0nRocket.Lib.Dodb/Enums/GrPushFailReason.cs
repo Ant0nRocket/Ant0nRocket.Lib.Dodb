@@ -33,6 +33,12 @@
         DatabaseError,
 
         /// <summary>
+        /// When response has a type that is not <see cref="Gateway.Responses.GrDtoPushSuccess"/> and not
+        /// <see cref="Gateway.Responses.GrDtoPushFailed"/>.
+        /// </summary>
+        UnknownResultType,
+
+        /// <summary>
         /// Reserved for on-top libraries. See 
         /// </summary>
         OtherReasons,
