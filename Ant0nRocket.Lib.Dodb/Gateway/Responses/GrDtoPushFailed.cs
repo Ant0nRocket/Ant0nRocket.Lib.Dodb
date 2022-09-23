@@ -53,6 +53,18 @@ namespace Ant0nRocket.Lib.Dodb.Gateway.Responses
         /// </summary>
         public List<string> Messages { get; } = new();
 
+#if DEBUG
+        /// <summary>
+        /// DbContext.ChancheTracker.DebugView.Short...
+        /// </summary>
+        public string? DbContextDebugViewShort { get; set; }
+
+        /// <summary>
+        /// DbContext.ChancheTracker.DebugView.Long...
+        /// </summary>
+        public string? DbContextDebugViewLong { get; set; }
+#endif
+
         /// <summary>
         /// Default constructor.
         /// </summary>

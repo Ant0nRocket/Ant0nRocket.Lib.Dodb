@@ -303,8 +303,10 @@ namespace Ant0nRocket.Lib.Dodb
                 }
                 else
                 {
-                    var message = $"push result has a type '{pushResult.GetType().Name}':" +
-                        $"app doesn't know ehat to do with it";
+                    var message = $"Push result '{pushResult.GetType().Name}' is not inherited from" +
+                        $"{nameof(GrDtoPushFailed)} or {nameof(GrDtoPushSuccess)}: fix that! " +
+                        $"Current transaction rolled back.";
+
                     logger.LogError(message);
                     return new GrDtoPushFailed(dto, message)
                     {
@@ -316,7 +318,14 @@ namespace Ant0nRocket.Lib.Dodb
             {
                 var message = ex.GetFullExceptionErrorMessage();
                 logger.LogError(message);
-                return new GrDtoPushFailed(dto, message, GrPushFailReason.DatabaseError);
+                var result = new GrDtoPushFailed(dto, message, GrPushFailReason.DatabaseError)
+                {
+#if DEBUG
+                    DbContextDebugViewLong = dbContext?.ChangeTracker.DebugView.LongView,
+                    DbContextDebugViewShort = dbContext?.ChangeTracker.DebugView.ShortView,
+#endif
+                };
+                return result;
             }
             finally
             {
