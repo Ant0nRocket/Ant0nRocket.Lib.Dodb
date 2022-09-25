@@ -1,4 +1,5 @@
 ﻿using Ant0nRocket.Lib.Dodb.Dto;
+using Ant0nRocket.Lib.Dodb.Dto.Payloads.Abstractions;
 using Ant0nRocket.Lib.Dodb.Enums;
 using Ant0nRocket.Lib.Dodb.Gateway.Abstractions;
 using Ant0nRocket.Lib.Std20.Extensions;
@@ -76,11 +77,27 @@ namespace Ant0nRocket.Lib.Dodb.Gateway.Responses
         public GrDtoPushFailed(
             DtoBase dto, 
             string message, 
-            GrPushFailReason reason = GrPushFailReason.ValidationFailed)
+            GrPushFailReason reason = GrPushFailReason.OtherReasons)
         {
             Dto = dto;
             Messages.Add(message);
             Reason = reason;
+        }
+
+        /// <summary>
+        /// Auto-set <see cref="Dto"/> by its carrier (<see cref="IPayload.GetCarrier"/>) 
+        /// and addes one <paramref name="message"/> to messages list.
+        /// </summary>
+        public GrDtoPushFailed(
+            IPayload dtoPayload,
+            string message,
+            GrPushFailReason reason = GrPushFailReason.OtherReasons
+            )
+        {
+            Dto = dtoPayload.GetCarrier();
+            Messages.Add(message);
+            Reason = reason;
+
         }
 
         /// <inheritdoc/>

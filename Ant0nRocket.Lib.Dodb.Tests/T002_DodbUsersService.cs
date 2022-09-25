@@ -1,10 +1,10 @@
-﻿using System.Threading.Tasks;
-
+﻿using Ant0nRocket.Lib.Dodb.Gateway.Responses;
 using Ant0nRocket.Lib.Dodb.Tests.Dto.Payloads;
 using Ant0nRocket.Lib.Dodb.Tests.Extensions;
-using Ant0nRocket.Lib.Dodb.Tests.Services.Responces.UsersService;
 
 using NUnit.Framework;
+
+using System.Threading.Tasks;
 
 namespace Ant0nRocket.Lib.Dodb.Tests
 {
@@ -19,7 +19,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
             dto.Payload.PasswordHash = "some hash";
             var pushResult = await Dodb.PushDtoAsync(dto);
 
-            pushResult.AssertIs<GrCreateUser_Success>();
+            pushResult.AssertIs<GrDtoPushSuccess>();
         }
     }
 }

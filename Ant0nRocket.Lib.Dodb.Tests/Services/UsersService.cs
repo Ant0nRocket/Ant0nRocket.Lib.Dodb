@@ -1,12 +1,12 @@
-﻿using System.Linq;
-
-using Ant0nRocket.Lib.Dodb.Gateway.Abstractions;
+﻿using Ant0nRocket.Lib.Dodb.Gateway.Abstractions;
+using Ant0nRocket.Lib.Dodb.Gateway.Responses;
 using Ant0nRocket.Lib.Dodb.Tests.Contexts;
 using Ant0nRocket.Lib.Dodb.Tests.Dto.Payloads;
 using Ant0nRocket.Lib.Dodb.Tests.Model;
-using Ant0nRocket.Lib.Dodb.Tests.Services.Responces.UsersService;
 
 using Microsoft.EntityFrameworkCore;
+
+using System.Linq;
 
 namespace Ant0nRocket.Lib.Dodb.Tests.Services
 {
@@ -31,7 +31,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests.Services
 
             if (user != default) // user exists
             {
-                return new GrCreateUser_Exists();
+                return new GrDtoPushFailed(dtoPayload, "User name busy");
             }
             else // user is new
             {
@@ -44,7 +44,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests.Services
                     DocumentRefId = dtoPayload.__CarrierId,
                 };
                 dbContext.Users.Add(user);
-                return new GrCreateUser_Success();
+                return new GrDtoPushSuccess(dtoPayload);
             }
         }
     }

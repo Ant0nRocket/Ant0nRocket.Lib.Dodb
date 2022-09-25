@@ -1,20 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-
-using Ant0nRocket.Lib.Dodb.Dto;
+﻿using Ant0nRocket.Lib.Dodb.Dto;
 using Ant0nRocket.Lib.Dodb.Enums;
 using Ant0nRocket.Lib.Dodb.Gateway.Responses;
-using Ant0nRocket.Lib.Dodb.Tests.Contexts;
 using Ant0nRocket.Lib.Dodb.Tests.Dto.Payloads.Mock;
 using Ant0nRocket.Lib.Dodb.Tests.Extensions;
-using Ant0nRocket.Lib.Dodb.Tests.Model;
-using Ant0nRocket.Lib.Dodb.Tests.Services.Responces.Mock;
-using Ant0nRocket.Lib.Std20.IO;
-using Ant0nRocket.Lib.Std20.Logging;
 
 using NUnit.Framework;
+
+using System;
 
 namespace Ant0nRocket.Lib.Dodb.Tests
 {
@@ -80,7 +72,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
             // Valid
             dto.Payload.Items.Add(new() { SomeIntValue = 10, SomeStringValue = "12" });
             pushResult = Dodb.PushDto(dto);
-            Assert.That(pushResult is GrOk);
+            Assert.That(pushResult is GrDtoPushSuccess);
 
             // Invalid
             dto.Payload.Items.Clear();

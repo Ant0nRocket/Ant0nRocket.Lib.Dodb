@@ -6,7 +6,6 @@ using Ant0nRocket.Lib.Dodb.Tests.Contexts;
 using Ant0nRocket.Lib.Dodb.Tests.Dto.Payloads;
 using Ant0nRocket.Lib.Dodb.Tests.Dto.Payloads.Mock;
 using Ant0nRocket.Lib.Dodb.Tests.Services;
-using Ant0nRocket.Lib.Dodb.Tests.Services.Responces.Mock;
 using Ant0nRocket.Lib.Std20;
 using Ant0nRocket.Lib.Std20.Logging;
 
@@ -35,8 +34,8 @@ namespace Ant0nRocket.Lib.Dodb.Tests
             return dtoPayloadObject switch
             {
                 PldCreateUser p => UsersService.CreateUser(p, c),
-                AnnotatedPayload => new GrOk(),
-                ListPayload => new GrOk(),
+                AnnotatedPayload p => new GrDtoPushSuccess(p),
+                ListPayload p => new GrDtoPushSuccess(p),
                 _ => new GrDtoPushFailed { Reason = Enums.GrPushFailReason.PayloadHandlerNotFound }
             };
         }
