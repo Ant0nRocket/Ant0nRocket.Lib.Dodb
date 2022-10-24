@@ -44,76 +44,6 @@ namespace Ant0nRocket.Lib.Dodb
 
         #endregion
 
-        #region Events
-
-        /// <summary>
-        /// Raised when <see cref="SyncDocuments(string)"/> start working.<br />
-        /// At this moment mutex have just been locked.
-        /// </summary>
-        public static event EventHandler? OnSyncDocumentsStarted;
-
-        /// <summary>
-        /// Stage 1 (see <see cref="Stage1_ScanSyncDocumentsDirectoryMinExportDate(string)"/>)
-        /// searches minimum date for exporting (UTC format).<br />
-        /// </summary>
-        public static event EventHandler<DateTime>? OnStage1_Complete;
-
-        /// <summary>
-        /// Stage 2 (see <see cref="Stage2_GetKnownDocumentIds(DateTime)"/>
-        /// retreives known documents Id list. Count of known documents will be passed.
-        /// </summary>
-        public static event EventHandler<int>? OnStage2_Complete;
-
-        /// <summary>
-        /// Stage 3 (see <see cref="Stage3_GetExportedDocumentsIdAndPathDict(string)"/>
-        /// retreives a dictionary of [DocumentId, DocumentPath] for all located in
-        /// sync directory files.
-        /// </summary>
-        public static event EventHandler<int>? OnStage3_Complete;
-
-        /// <summary>
-        /// Stage 4 calculates which documents required to be exported.
-        /// </summary>
-        public static event EventHandler<int>? OnStage4_Complete;
-
-        /// <summary>
-        /// Stage 5 calculates which documents required to be imported.
-        /// </summary>
-        public static event EventHandler<int>? OnStage5_Complete;
-
-        /// <summary>
-        /// Stage 6 is actual exporting of documents.
-        /// </summary>
-        public static event EventHandler? OnStage6_Started;
-
-        /// <summary>
-        /// When document exported.
-        /// </summary>
-        public static event EventHandler<Guid>? OnStage6_WorkUnitDone;
-
-        /// <summary>
-        /// Stage 7 is actual importing of documents.
-        /// </summary>
-        public static event EventHandler? OnStage7_Started;
-
-        /// <summary>
-        /// When document imported.
-        /// </summary>
-        public static event EventHandler<Guid>? OnStage7_WorkUnitDone;
-
-        /// <summary>
-        /// When import of document failed for any reason.
-        /// </summary>
-        public static event EventHandler<IGatewayResponse>? OnStage7_WorkUnitFailed;
-
-        /// <summary>
-        /// Raised when <see cref="SyncDocuments(string)"/> finished working (no matter why).<br />
-        /// At this moment mutex have just become free.
-        /// </summary>
-        public static event EventHandler? OnSyncDocumentsFinished;
-
-        #endregion
-
         #region Constants
 
         private const string ERROR_GETTING_DBCONTEXT = $"Can't create DbContext. Check {nameof(Initialize)} were called with non-null args.";
@@ -209,6 +139,9 @@ namespace Ant0nRocket.Lib.Dodb
             var dtoHandleResponse =
                 TryHandleDtoPayloadExternally(dtoPayload, dbContext) ??
                 new GrDtoPushFailed { Reason = GrPushFailReason.PayloadHandlerNotFound, Dto = dto };
+
+            if (dtoHandleResponse is GrDtoPushSuccess success && success.SkipDocumentCreation)
+                return dtoHandleResponse; // prevent creating a document, because of flag SkipDocumentCreation
 
             var document = new Document
             {
@@ -338,7 +271,7 @@ namespace Ant0nRocket.Lib.Dodb
         /// <summary>
         /// <inheritdoc cref="PushDto(DtoBase)" />
         /// </summary>
-        public static async Task<IGatewayResponse> PushDtoAsync(DtoBase dto) => 
+        public static async Task<IGatewayResponse> PushDtoAsync(DtoBase dto) =>
             await Task.Run(() => PushDto(dto));
 
         #endregion
@@ -371,9 +304,9 @@ namespace Ant0nRocket.Lib.Dodb
             return result;
         }
 
+        #endregion
 
-
-        #region Sync documents
+        #region Documents synchronization
 
         /// <inheritdoc cref="SyncDocuments(string)"/>
         public static async Task SyncDocumentsAsync(string syncDocumentsDirectoryPath) =>
@@ -394,39 +327,41 @@ namespace Ant0nRocket.Lib.Dodb
                 FileSystemUtils.TouchDirectory(syncDocumentsDirectoryPath); // just to sure
 
                 _mutex.WaitOne();
-                OnSyncDocumentsStarted?.Invoke(null, EventArgs.Empty);
+                logger.LogInformation($"Documents synchronization started...");
 
                 PerformSyncDocumentsIteration(syncDocumentsDirectoryPath);
 
                 _mutex.ReleaseMutex();
-                OnSyncDocumentsFinished?.Invoke(null, EventArgs.Empty);
+                logger.LogInformation($"Documents synchronization finished.");
             }
         }
 
         private static void PerformSyncDocumentsIteration(string syncDocumentsDirectoryPath)
         {
             var exportFromDate = Stage1_ScanSyncDocumentsDirectoryMinExportDate(syncDocumentsDirectoryPath);
-            OnStage1_Complete?.Invoke(null, exportFromDate);
+            logger.LogInformation($"Operational period begin is {exportFromDate}");
 
             var knownDocumentIds = Stage2_GetKnownDocumentIds(exportFromDate);
-            OnStage2_Complete?.Invoke(null, knownDocumentIds.Count);
+            logger.LogInformation($"Database has {knownDocumentIds.Count} documents for specified period");
 
             var exportedDocumentsIdAndPathDict = Stage3_GetExportedDocumentsIdAndPathDict(syncDocumentsDirectoryPath);
-            OnStage3_Complete?.Invoke(null, exportedDocumentsIdAndPathDict.Count);
+            logger.LogInformation($"Already exported documents count is {exportedDocumentsIdAndPathDict.Count}");
 
             var documentIdsToExportList = Stage4_GetDocumentIdsToExportList(knownDocumentIds, exportedDocumentsIdAndPathDict);
-            OnStage4_Complete?.Invoke(null, documentIdsToExportList.Count());
+            logger.LogInformation($"Documents to export count is {documentIdsToExportList.Count()}");
 
             var documentIdAndPathToImportDict = Stage5_GetDocumentIdAndPathToImportDict(
                 knownDocumentIds,
                 exportedDocumentsIdAndPathDict);
-            OnStage5_Complete?.Invoke(null, documentIdAndPathToImportDict.Count);
+            logger.LogInformation($"Documents to import count is {documentIdAndPathToImportDict.Count}");
 
-            OnStage6_Started?.Invoke(null, EventArgs.Empty);
+            logger.LogInformation("Documents export began...");
             Stage6_ExportDocuments(documentIdsToExportList, syncDocumentsDirectoryPath);
+            logger.LogInformation("Documents export finished.");
 
-            OnStage7_Started?.Invoke(null, EventArgs.Empty);
+            logger.LogInformation("Documents import began...");
             Stafe7_ImportDocuments(documentIdAndPathToImportDict);
+            logger.LogInformation("Documents import finished.");
         }
 
         /// <summary>
@@ -577,7 +512,7 @@ namespace Ant0nRocket.Lib.Dodb
                 var resultPath = Path.Combine(syncDocumentsDirectoryWithSubFolderPath, shortFileName);
 
                 File.WriteAllText(resultPath, documentJsonValue);
-                OnStage6_WorkUnitDone?.Invoke(null, documentId);
+                logger.LogInformation($"Document '{documentId}' have been exported.");
             }
         }
 
@@ -619,18 +554,18 @@ namespace Ant0nRocket.Lib.Dodb
 
                 if (pushResult is GrDtoPushSuccess)
                 {
-                    OnStage7_WorkUnitDone?.Invoke(null, dto.Id);
+                    logger.LogInformation($"Documents '{dto.Id}' have been imported.");
+                }
+                else if (pushResult is GrDtoPushFailed f)
+                {
+                    logger.LogError($"Unable to import document from file '{kvp.Value}': {f.Messages.AsJson()}");
                 }
                 else
                 {
-                    logger.LogError($"Unable to import document from file '{kvp.Value}': " +
-                        $"got '{pushResult.GetType().Name}' ({pushResult.AsJson()})");
-                    OnStage7_WorkUnitFailed?.Invoke(null, pushResult);
+                    logger.LogFatal($"UNKNOWN PUSH RESULT '{pushResult.GetType().Name}");
                 }
             }
         }
-
-        #endregion
 
         #endregion
 
