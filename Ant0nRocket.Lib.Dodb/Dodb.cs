@@ -38,9 +38,18 @@ namespace Ant0nRocket.Lib.Dodb
 
         private static bool _isInitialized = false;
 
-        private static Mutex _mutex = new();
+        private static Mutex mutexForPushDto = new();
 
         private static readonly Dictionary<string, int> _payloadType_Id_Cache = new();
+
+        #endregion
+
+        #region Events
+
+        /// <summary>
+        /// When there is a success document write to database.
+        /// </summary>
+        public static event EventHandler<long>? OnDatabaseVersionUpdate;
 
         #endregion
 
@@ -218,7 +227,7 @@ namespace Ant0nRocket.Lib.Dodb
 
             try
             {
-                _mutex.WaitOne(); // Take a mutex (or wait here until busy)
+                mutexForPushDto.WaitOne(); // Take a mutex (or wait here until busy)
 
                 var pushResult = PushDtoObject(dto, dbContext);
 
@@ -227,6 +236,7 @@ namespace Ant0nRocket.Lib.Dodb
                     dbContext.SaveChanges();
                     transaction?.Commit();
                     logger.LogInformation($"DTO '{dto.Id}' applied to database");
+                    OnDatabaseVersionUpdate?.Invoke(null, dto.DateCreatedUtc.Ticks);
                     return pushResult;
                 }
                 else if (pushResult is GrDtoPushFailed failedResult)
@@ -264,7 +274,7 @@ namespace Ant0nRocket.Lib.Dodb
             {
                 // Transaction and dbcontext will be disposed automatically.
                 // If transaction were not commited - rollback will be called.
-                _mutex.ReleaseMutex(); // release mutex
+                mutexForPushDto.ReleaseMutex(); // release mutex
             }
         }
 
@@ -306,7 +316,7 @@ namespace Ant0nRocket.Lib.Dodb
 
         #endregion
 
-        #region Documents synchronization
+        #region Synchronization
 
         /// <inheritdoc cref="SyncDocuments(string)"/>
         public static async Task SyncDocumentsAsync(string syncDocumentsDirectoryPath) =>
@@ -326,12 +336,12 @@ namespace Ant0nRocket.Lib.Dodb
             {
                 FileSystemUtils.TouchDirectory(syncDocumentsDirectoryPath); // just to sure
 
-                _mutex.WaitOne();
+                mutexForPushDto.WaitOne();
                 logger.LogInformation($"Documents synchronization started...");
 
                 PerformSyncDocumentsIteration(syncDocumentsDirectoryPath);
 
-                _mutex.ReleaseMutex();
+                mutexForPushDto.ReleaseMutex();
                 logger.LogInformation($"Documents synchronization finished.");
             }
         }
