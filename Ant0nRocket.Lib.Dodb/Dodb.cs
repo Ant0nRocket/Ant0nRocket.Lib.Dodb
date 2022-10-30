@@ -343,12 +343,14 @@ namespace Ant0nRocket.Lib.Dodb
         }
 
         private static bool CheckIsCancellationRequested(CancellationToken? cancellationToken, string stoppedAtStageName)
-        {
-            if (cancellationToken == default)
-                return false;
+        {            
+            if (cancellationToken?.IsCancellationRequested ?? false)
+            {
+                logger.LogInformation($"Sync cancellation requested. Sync process stopped at [{stoppedAtStageName}]");
+                return true;
+            }
 
-            logger.LogInformation($"Sync cancellation requested. Sync process stopped at [{stoppedAtStageName}]");
-            return true;
+            return false;
         }
 
         private static void PerformSyncDocumentsIteration(string syncDocumentsDirectoryPath, CancellationToken? cancellationToken = default)
