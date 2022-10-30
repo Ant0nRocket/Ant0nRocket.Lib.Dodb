@@ -318,14 +318,10 @@ namespace Ant0nRocket.Lib.Dodb
 
         #region Synchronization
 
-        /// <inheritdoc cref="SyncDocuments(string)"/>
-        public static async Task SyncDocumentsAsync(string syncDocumentsDirectoryPath) =>
-            await Task.Run(() => SyncDocuments(syncDocumentsDirectoryPath));
+        public static async Task SyncDocumentsAsync(string syncDocumentsDirectoryPath, CancellationToken? cancellationToken = default) =>
+            await Task.Run(() => SyncDocuments(syncDocumentsDirectoryPath, cancellationToken));
 
-        /// <summary>
-        /// Performes syncthronization of known Documents inside <paramref name="syncDocumentsDirectoryPath"/>.<br />
-        /// </summary>
-        public static void SyncDocuments(string syncDocumentsDirectoryPath)
+        public static void SyncDocuments(string syncDocumentsDirectoryPath, CancellationToken? cancellationToken = default)
         {
             if (syncDocumentsDirectoryPath == default)
             {
@@ -339,38 +335,57 @@ namespace Ant0nRocket.Lib.Dodb
                 mutexForPushDto.WaitOne();
                 logger.LogInformation($"Documents synchronization started...");
 
-                PerformSyncDocumentsIteration(syncDocumentsDirectoryPath);
+                PerformSyncDocumentsIteration(syncDocumentsDirectoryPath, cancellationToken);
 
                 mutexForPushDto.ReleaseMutex();
                 logger.LogInformation($"Documents synchronization finished.");
             }
         }
 
-        private static void PerformSyncDocumentsIteration(string syncDocumentsDirectoryPath)
+        private static bool CheckIsCancellationRequested(CancellationToken? cancellationToken, string stoppedAtStageName)
+        {
+            if (cancellationToken == default)
+                return false;
+
+            logger.LogInformation($"Sync cancellation requested. Sync process stopped at [{stoppedAtStageName}]");
+            return true;
+        }
+
+        private static void PerformSyncDocumentsIteration(string syncDocumentsDirectoryPath, CancellationToken? cancellationToken = default)
         {
             var exportFromDate = Stage1_ScanSyncDocumentsDirectoryMinExportDate(syncDocumentsDirectoryPath);
             logger.LogInformation($"Operational period begin is {exportFromDate}");
+            if (CheckIsCancellationRequested(cancellationToken, nameof(Stage1_ScanSyncDocumentsDirectoryMinExportDate)))
+                return;
 
             var knownDocumentIds = Stage2_GetKnownDocumentIds(exportFromDate);
             logger.LogInformation($"Database has {knownDocumentIds.Count} documents for specified period");
+            if (CheckIsCancellationRequested(cancellationToken, nameof(Stage2_GetKnownDocumentIds)))
+                return;
 
             var exportedDocumentsIdAndPathDict = Stage3_GetExportedDocumentsIdAndPathDict(syncDocumentsDirectoryPath);
             logger.LogInformation($"Already exported documents count is {exportedDocumentsIdAndPathDict.Count}");
+            if (CheckIsCancellationRequested(cancellationToken, nameof(Stage3_GetExportedDocumentsIdAndPathDict)))
+                return;
 
             var documentIdsToExportList = Stage4_GetDocumentIdsToExportList(knownDocumentIds, exportedDocumentsIdAndPathDict);
             logger.LogInformation($"Documents to export count is {documentIdsToExportList.Count()}");
+            if (CheckIsCancellationRequested(cancellationToken, nameof(Stage4_GetDocumentIdsToExportList)))
+                return;
 
             var documentIdAndPathToImportDict = Stage5_GetDocumentIdAndPathToImportDict(
                 knownDocumentIds,
                 exportedDocumentsIdAndPathDict);
             logger.LogInformation($"Documents to import count is {documentIdAndPathToImportDict.Count}");
+            if (CheckIsCancellationRequested(cancellationToken, nameof(Stage5_GetDocumentIdAndPathToImportDict)))
+                return;
 
             logger.LogInformation("Documents export began...");
-            Stage6_ExportDocuments(documentIdsToExportList, syncDocumentsDirectoryPath);
+            Stage6_ExportDocuments(documentIdsToExportList, syncDocumentsDirectoryPath, cancellationToken);
             logger.LogInformation("Documents export finished.");
 
             logger.LogInformation("Documents import began...");
-            Stafe7_ImportDocuments(documentIdAndPathToImportDict);
+            Stage7_ImportDocuments(documentIdAndPathToImportDict, cancellationToken);
             logger.LogInformation("Documents import finished.");
         }
 
@@ -494,12 +509,15 @@ namespace Ant0nRocket.Lib.Dodb
         /// Retreives documents from <paramref name="documentIdsToExportList"/> and exports them
         /// into directory <paramref name="syncDocumentsDirectoryPath"/>.
         /// </summary>
-        private static void Stage6_ExportDocuments(IEnumerable<Guid> documentIdsToExportList, string syncDocumentsDirectoryPath)
+        private static void Stage6_ExportDocuments(IEnumerable<Guid> documentIdsToExportList, string syncDocumentsDirectoryPath, CancellationToken? cancellationToken = default)
         {
             using var dbContext = GetDbContext();
 
             foreach (var documentId in documentIdsToExportList)
             {
+                if (CheckIsCancellationRequested(cancellationToken, nameof(Stage6_ExportDocuments)))
+                    return;
+
                 var document = dbContext
                     .Documents
                     .AsNoTracking()
@@ -529,10 +547,13 @@ namespace Ant0nRocket.Lib.Dodb
         /// <summary>
         /// Peformes import of documents specified in <paramref name="documentIdAndPathToImportDict"/>.
         /// </summary>
-        private static void Stafe7_ImportDocuments(IDictionary<Guid, string> documentIdAndPathToImportDict)
+        private static void Stage7_ImportDocuments(IDictionary<Guid, string> documentIdAndPathToImportDict, CancellationToken? cancellationToken = default)
         {
             foreach (var kvp in documentIdAndPathToImportDict)
             {
+                if (CheckIsCancellationRequested(cancellationToken, nameof(Stage7_ImportDocuments)))
+                    return;
+
                 var document = FileSystemUtils.TryReadFromFile<Document>(kvp.Value);
                 if (document!.Id != kvp.Key)
                 {
