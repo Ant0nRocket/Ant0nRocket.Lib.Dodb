@@ -236,7 +236,19 @@ namespace Ant0nRocket.Lib.Dodb
                     dbContext.SaveChanges();
                     transaction?.Commit();
                     logger.LogInformation($"DTO '{dto.Id}' applied to database");
-                    OnDatabaseVersionUpdate?.Invoke(null, dto.DateCreatedUtc.Ticks);
+
+                    // dangerous operation, could lead to exception, so do in another thread
+                    _ = Task.Run(() =>
+                    {
+                        try
+                        {
+                            OnDatabaseVersionUpdate?.Invoke(null, dto.DateCreatedUtc.Ticks);
+                        }catch (Exception e)
+                        {
+                            Logger.Log(e.GetFullExceptionErrorMessage(), LogLevel.Error, nameof(OnDatabaseVersionUpdate));
+                        }
+                    });
+
                     return pushResult;
                 }
                 else if (pushResult is GrDtoPushFailed failedResult)
@@ -343,7 +355,7 @@ namespace Ant0nRocket.Lib.Dodb
         }
 
         private static bool CheckIsCancellationRequested(CancellationToken? cancellationToken, string stoppedAtStageName)
-        {            
+        {
             if (cancellationToken?.IsCancellationRequested ?? false)
             {
                 logger.LogInformation($"Sync cancellation requested. Sync process stopped at [{stoppedAtStageName}]");
