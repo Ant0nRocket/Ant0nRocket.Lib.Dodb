@@ -17,6 +17,11 @@
         RequiredDocumentNotExists,
 
         /// <summary>
+        /// Every document (except very first one) must have <see cref="Dto.DtoBase.RequiredDocumentId"/>
+        /// </summary>
+        RequiredDocumentNotSpecified,
+
+        /// <summary>
         /// No handler registred for current <see cref="Dto.DtoOf{T}.Payload"/> type.
         /// </summary>
         PayloadHandlerNotFound,

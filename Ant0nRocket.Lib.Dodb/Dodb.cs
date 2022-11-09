@@ -201,24 +201,27 @@ namespace Ant0nRocket.Lib.Dodb
                 return new GrDtoPushFailed { Reason = GrPushFailReason.DocumentExists, Dto = dto };
             }
 
-            if (dto.RequiredDocumentId != null)
+            if (dto.RequiredDocumentId == default || dto.RequiredDocumentId == Guid.Empty)
             {
-                if (!dbContext.Documents.Any(d => d.Id == dto.RequiredDocumentId))
+                // DTO doesn't have required document. Only first document could be so funny :)
+                if (dbContext.Documents.Any()) // so if there are any documents
                 {
-                    return new GrDtoPushFailed
+                    return new GrDtoPushFailed // return error!
+                    {
+                        Reason = GrPushFailReason.RequiredDocumentNotSpecified,
+                        Dto = dto,
+                    };
+                }
+            }
+            else // we have some RequiredDocumentId specified
+            {
+                if (!dbContext.Documents.Any(d => d.Id == dto.RequiredDocumentId)) // if it doesn't found
+                {
+                    return new GrDtoPushFailed // return error (ooops! :))
                     {
                         Reason = GrPushFailReason.RequiredDocumentNotExists,
                         Dto = dto
                     };
-                }
-            }
-            else // RequiredDocumentId is NOT specified
-            {
-                // This situation could be ONLY when there is a first document. 
-                // So, if any document exists there should not be a DTO without RequiredDocumentId
-                if (dbContext.Documents.Any())
-                {
-                    return new GrDtoPushFailed(dto, "RequiredDocumentId must be specified!");
                 }
             }
 

@@ -65,7 +65,8 @@ namespace Ant0nRocket.Lib.Dodb.Gateway.Helpers
 
         private void OnValidationErrorFound(string propertyName, string errorText)
         {
-            ValidationResults.Add(new ValidationResult(errorText, new[] { propertyName }));
+            var error = $"{propertyName}: {errorText}";
+            ValidationResults.Add(new ValidationResult(error, null));
         }
     }
 }
