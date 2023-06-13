@@ -246,7 +246,8 @@ namespace Ant0nRocket.Lib.Dodb
                         try
                         {
                             OnDatabaseVersionUpdate?.Invoke(null, dto.DateCreatedUtc.Ticks);
-                        }catch (Exception e)
+                        }
+                        catch (Exception e)
                         {
                             Logger.Log(e.GetFullExceptionErrorMessage(), LogLevel.Error, nameof(OnDatabaseVersionUpdate));
                         }
@@ -488,7 +489,14 @@ namespace Ant0nRocket.Lib.Dodb
                 if (match.Success)
                 {
                     var documentId = Guid.Parse(match.Groups["DocumentId"].Value);
-                    foundDocumentsIdAndPath.Add(documentId, f);
+                    if (foundDocumentsIdAndPath.ContainsKey(documentId))
+                    {
+                        logger.LogError($"Id {documentId} already added! SYNC CONFLICT???");
+                    }
+                    else
+                    {
+                        foundDocumentsIdAndPath.Add(documentId, f);
+                    }
                 }
             });
 
