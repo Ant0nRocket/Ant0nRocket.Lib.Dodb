@@ -6,8 +6,7 @@ using Ant0nRocket.Lib.Dodb.Tests.Contexts;
 using Ant0nRocket.Lib.Dodb.Tests.Dto.Payloads;
 using Ant0nRocket.Lib.Dodb.Tests.Dto.Payloads.Mock;
 using Ant0nRocket.Lib.Dodb.Tests.Services;
-using Ant0nRocket.Lib.Std20;
-using Ant0nRocket.Lib.Std20.Logging;
+using Ant0nRocket.Lib.Logging;
 
 using NUnit.Framework;
 

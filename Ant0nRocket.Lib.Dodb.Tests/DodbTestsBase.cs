@@ -1,10 +1,8 @@
 ﻿using System;
 
 using Ant0nRocket.Lib.Dodb.Dto;
-using Ant0nRocket.Lib.Dodb.Gateway.Abstractions;
-using Ant0nRocket.Lib.Std20;
-using Ant0nRocket.Lib.Std20.IO;
-using Ant0nRocket.Lib.Std20.Logging;
+using Ant0nRocket.Lib.IO;
+using Ant0nRocket.Lib.Logging;
 
 namespace Ant0nRocket.Lib.Dodb.Tests
 {

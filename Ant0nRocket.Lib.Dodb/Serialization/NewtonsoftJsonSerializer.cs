@@ -1,4 +1,4 @@
-﻿using Ant0nRocket.Lib.Std20.Serialization;
+﻿using Ant0nRocket.Lib.Serialization;
 
 namespace Ant0nRocket.Lib.Dodb.Serialization
 {

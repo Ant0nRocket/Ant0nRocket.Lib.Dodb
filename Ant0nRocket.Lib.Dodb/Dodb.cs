@@ -8,12 +8,11 @@ using Ant0nRocket.Lib.Dodb.Gateway.Helpers;
 using Ant0nRocket.Lib.Dodb.Gateway.Responses;
 using Ant0nRocket.Lib.Dodb.Models;
 using Ant0nRocket.Lib.Dodb.Serialization;
-using Ant0nRocket.Lib.Std20;
-using Ant0nRocket.Lib.Std20.Cryptography;
-using Ant0nRocket.Lib.Std20.Extensions;
-using Ant0nRocket.Lib.Std20.IO;
-using Ant0nRocket.Lib.Std20.Logging;
-using Ant0nRocket.Lib.Std20.Reflection;
+using Ant0nRocket.Lib.Cryptography;
+using Ant0nRocket.Lib.Extensions;
+using Ant0nRocket.Lib.IO;
+using Ant0nRocket.Lib.Logging;
+using Ant0nRocket.Lib.Reflection;
 
 using Microsoft.EntityFrameworkCore;
 

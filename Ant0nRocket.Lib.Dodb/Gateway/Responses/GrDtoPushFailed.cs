@@ -2,7 +2,7 @@
 using Ant0nRocket.Lib.Dodb.Dto.Payloads.Abstractions;
 using Ant0nRocket.Lib.Dodb.Enums;
 using Ant0nRocket.Lib.Dodb.Gateway.Abstractions;
-using Ant0nRocket.Lib.Std20.Extensions;
+using Ant0nRocket.Lib.Extensions;
 
 namespace Ant0nRocket.Lib.Dodb.Gateway.Responses
 {
