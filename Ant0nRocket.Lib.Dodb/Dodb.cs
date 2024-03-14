@@ -8,7 +8,6 @@ using Ant0nRocket.Lib.Dodb.Gateway.Helpers;
 using Ant0nRocket.Lib.Dodb.Gateway.Responses;
 using Ant0nRocket.Lib.Dodb.Models;
 using Ant0nRocket.Lib.Dodb.Serialization;
-using Ant0nRocket.Lib.Cryptography;
 using Ant0nRocket.Lib.Extensions;
 using Ant0nRocket.Lib.IO;
 using Ant0nRocket.Lib.Logging;
@@ -92,7 +91,7 @@ namespace Ant0nRocket.Lib.Dodb
 
         private static string DefaultPasswordHashHandler(string plainPassword)
         {
-            return Hasher.ComputeHash(plainPassword).ToHexString();
+            return plainPassword.ComputeSHA256Hash().ToHexString();
         }
 
         internal static GetPasswordHashHandler GetPasswordHashHandler() =>
