@@ -225,11 +225,8 @@ namespace Ant0nRocket.Lib.Dodb
 
             #endregion
 
-
             try
             {
-                mutexForPushDto.WaitOne(); // Take a mutex (or wait here until busy)
-
                 var pushResult = PushDtoObject(dto, dbContext);
 
                 if (pushResult is GrDtoPushSuccess)
@@ -284,19 +281,24 @@ namespace Ant0nRocket.Lib.Dodb
                 };
                 return result;
             }
-            finally
-            {
-                // Transaction and dbcontext will be disposed automatically.
-                // If transaction were not commited - rollback will be called.
-                mutexForPushDto.ReleaseMutex(); // release mutex
-            }
         }
 
         /// <summary>
         /// <inheritdoc cref="PushDto(DtoBase)" />
         /// </summary>
         public static async Task<IGatewayResponse> PushDtoAsync(DtoBase dto) =>
-            await Task.Run(() => PushDto(dto));
+            await Task.Run(() =>
+            {
+                mutexForPushDto.WaitOne();
+                try
+                {
+                    return PushDto(dto);
+                }
+                finally
+                {
+                    mutexForPushDto.ReleaseMutex();
+                }
+            });
 
         #endregion
 
@@ -333,7 +335,18 @@ namespace Ant0nRocket.Lib.Dodb
         #region Synchronization
 
         public static async Task SyncDocumentsAsync(string syncDocumentsDirectoryPath, CancellationToken? cancellationToken = default) =>
-            await Task.Run(() => SyncDocuments(syncDocumentsDirectoryPath, cancellationToken));
+            await Task.Run(() =>
+            {
+                mutexForPushDto.WaitOne();
+                try
+                {
+                    SyncDocuments(syncDocumentsDirectoryPath, cancellationToken);
+                }
+                finally
+                {
+                    mutexForPushDto.ReleaseMutex();
+                }
+            });
 
         public static void SyncDocuments(string syncDocumentsDirectoryPath, CancellationToken? cancellationToken = default)
         {
@@ -346,12 +359,10 @@ namespace Ant0nRocket.Lib.Dodb
             {
                 FileSystemUtils.TouchDirectory(syncDocumentsDirectoryPath); // just to sure
 
-                mutexForPushDto.WaitOne();
                 logger.LogInformation($"Documents synchronization started...");
 
                 PerformSyncDocumentsIteration(syncDocumentsDirectoryPath, cancellationToken);
 
-                mutexForPushDto.ReleaseMutex();
                 logger.LogInformation($"Documents synchronization finished.");
             }
         }
