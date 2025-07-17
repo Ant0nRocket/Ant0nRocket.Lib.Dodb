@@ -21,7 +21,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests
 
             var filesList = new List<string>();
             FileSystemUtils.ScanDirectoryRecursively(syncDirectory, f => filesList.Add(f));
-            Assert.AreEqual(2, filesList.Count);
+            Assert.That(filesList.Count == 2);
         }
 
         [Test]
@@ -31,17 +31,17 @@ namespace Ant0nRocket.Lib.Dodb.Tests
             var syncDirectory = Path.Combine(FileSystemUtils.GetDefaultAppDataFolderPath(), "Sync");
             var filesList = new List<string>();
             FileSystemUtils.ScanDirectoryRecursively(syncDirectory, f => filesList.Add(f));
-            Assert.AreEqual(2, filesList.Count);
+            Assert.That(filesList.Count == 2);
 
             using var dbContext = new TestDbContext();
             dbContext.Documents.RemoveRange(dbContext.Documents);
             dbContext.Users.RemoveRange(dbContext.Users);
             dbContext.SaveChanges();
-            Assert.AreEqual(false, dbContext.Documents.Any());
+            Assert.That(dbContext.Documents.Any() == false);
 
             await Dodb.SyncDocumentsAsync(syncDirectory);
 
-            Assert.AreEqual(2, dbContext.Documents.Count());
+            Assert.That(dbContext.Documents.Count() == 2);
         }
     }
 }

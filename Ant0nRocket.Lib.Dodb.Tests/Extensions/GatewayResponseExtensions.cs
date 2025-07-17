@@ -12,18 +12,18 @@ namespace Ant0nRocket.Lib.Dodb.Tests.Extensions
     {
         public static T AssertIs<T>(this IGatewayResponse gatewayResponse)
         {
-            Assert.NotNull(gatewayResponse);
-            Assert.AreEqual(typeof(T), gatewayResponse.GetType());
+            Assert.That(gatewayResponse is not null);
+            Assert.That(typeof(T) == gatewayResponse?.GetType());
             if (gatewayResponse is T result) return result;
             throw new ApplicationException("imposible");
         }
 
         public static void AssertFailReasonIs(this IGatewayResponse gatewayResponse, GrPushFailReason reason)
         {
-            Assert.NotNull(gatewayResponse);
+            Assert.That(gatewayResponse is not null);
             if (gatewayResponse is GrDtoPushFailed f)
             {
-                Assert.AreEqual(reason, f.Reason);
+                Assert.That(reason == f.Reason);
             }
             else
             {
