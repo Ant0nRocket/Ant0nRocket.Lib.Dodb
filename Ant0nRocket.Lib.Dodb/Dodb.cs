@@ -332,6 +332,12 @@ namespace Ant0nRocket.Lib.Dodb
 
         #region Synchronization
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="syncDocumentsDirectoryPath"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
         public static async Task SyncDocumentsAsync(string syncDocumentsDirectoryPath, CancellationToken? cancellationToken = default) =>
             await Task.Run(() =>
             {
@@ -346,6 +352,11 @@ namespace Ant0nRocket.Lib.Dodb
                 }
             });
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="syncDocumentsDirectoryPath"></param>
+        /// <param name="cancellationToken"></param>
         public static void SyncDocuments(string syncDocumentsDirectoryPath, CancellationToken? cancellationToken = default)
         {
             if (syncDocumentsDirectoryPath == default)
