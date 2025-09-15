@@ -32,8 +32,6 @@ namespace Ant0nRocket.Lib.Dodb
     {
         #region Private fields
 
-        private static readonly Logger logger = Logger.Create(nameof(Dodb));
-
         private static bool _isInitialized = false;
 
         private static Mutex mutexForPushDto = new();
@@ -233,7 +231,7 @@ namespace Ant0nRocket.Lib.Dodb
                 {
                     dbContext.SaveChanges();
                     transaction?.Commit();
-                    logger.LogInformation($"DTO '{dto.Id}' applied to database");
+                    Logger.LogInformation($"DTO '{dto.Id}' applied to database");
 
                     // dangerous operation, could lead to exception, so do in another thread
                     _ = Task.Run(() =>
@@ -252,7 +250,7 @@ namespace Ant0nRocket.Lib.Dodb
                 }
                 else if (pushResult is GrDtoPushFailed failedResult)
                 {
-                    logger.LogObject(failedResult);
+                    Logger.LogObject(failedResult);
                     return failedResult;
                 }
                 else
@@ -261,7 +259,7 @@ namespace Ant0nRocket.Lib.Dodb
                         $"{nameof(GrDtoPushFailed)} or {nameof(GrDtoPushSuccess)}: fix that! " +
                         $"Current transaction rolled back.";
 
-                    logger.LogError(message);
+                    Logger.LogError(message);
                     return new GrDtoPushFailed(dto, message)
                     {
                         Reason = GrPushFailReason.UnknownResultType
@@ -271,7 +269,7 @@ namespace Ant0nRocket.Lib.Dodb
             catch (Exception ex)
             {
                 var message = ex.GetFullExceptionErrorMessage();
-                logger.LogError(message);
+                Logger.LogError(message);
                 var result = new GrDtoPushFailed(dto, message, GrPushFailReason.DatabaseError)
                 {
 #if DEBUG
@@ -353,17 +351,17 @@ namespace Ant0nRocket.Lib.Dodb
             if (syncDocumentsDirectoryPath == default)
             {
                 const string ERROR_MESSAGE = "SyncDirectoryPath is not set";
-                logger.LogError(ERROR_MESSAGE);
+                Logger.LogError(ERROR_MESSAGE);
             }
             else
             {
                 FileSystemUtils.TouchDirectory(syncDocumentsDirectoryPath); // just to sure
 
-                logger.LogInformation($"Documents synchronization started...");
+                Logger.LogInformation($"Documents synchronization started...");
 
                 PerformSyncDocumentsIteration(syncDocumentsDirectoryPath, cancellationToken);
 
-                logger.LogInformation($"Documents synchronization finished.");
+                Logger.LogInformation($"Documents synchronization finished.");
             }
         }
 
@@ -371,7 +369,7 @@ namespace Ant0nRocket.Lib.Dodb
         {
             if (cancellationToken?.IsCancellationRequested ?? false)
             {
-                logger.LogInformation($"Sync cancellation requested. Sync process stopped at [{stoppedAtStageName}]");
+                Logger.LogInformation($"Sync cancellation requested. Sync process stopped at [{stoppedAtStageName}]");
                 return true;
             }
 
@@ -381,39 +379,39 @@ namespace Ant0nRocket.Lib.Dodb
         private static void PerformSyncDocumentsIteration(string syncDocumentsDirectoryPath, CancellationToken? cancellationToken = default)
         {
             var exportFromDate = Stage1_ScanSyncDocumentsDirectoryMinExportDate(syncDocumentsDirectoryPath);
-            logger.LogInformation($"Operational period begin is {exportFromDate}");
+            Logger.LogInformation($"Operational period begin is {exportFromDate}");
             if (CheckIsCancellationRequested(cancellationToken, nameof(Stage1_ScanSyncDocumentsDirectoryMinExportDate)))
                 return;
 
             var knownDocumentIds = Stage2_GetKnownDocumentIds(exportFromDate);
-            logger.LogInformation($"Database has {knownDocumentIds.Count} documents for specified period");
+            Logger.LogInformation($"Database has {knownDocumentIds.Count} documents for specified period");
             if (CheckIsCancellationRequested(cancellationToken, nameof(Stage2_GetKnownDocumentIds)))
                 return;
 
             var exportedDocumentsIdAndPathDict = Stage3_GetExportedDocumentsIdAndPathDict(syncDocumentsDirectoryPath);
-            logger.LogInformation($"Already exported documents count is {exportedDocumentsIdAndPathDict.Count}");
+            Logger.LogInformation($"Already exported documents count is {exportedDocumentsIdAndPathDict.Count}");
             if (CheckIsCancellationRequested(cancellationToken, nameof(Stage3_GetExportedDocumentsIdAndPathDict)))
                 return;
 
             var documentIdsToExportList = Stage4_GetDocumentIdsToExportList(knownDocumentIds, exportedDocumentsIdAndPathDict);
-            logger.LogInformation($"Documents to export count is {documentIdsToExportList.Count()}");
+            Logger.LogInformation($"Documents to export count is {documentIdsToExportList.Count()}");
             if (CheckIsCancellationRequested(cancellationToken, nameof(Stage4_GetDocumentIdsToExportList)))
                 return;
 
             var documentIdAndPathToImportDict = Stage5_GetDocumentIdAndPathToImportDict(
                 knownDocumentIds,
                 exportedDocumentsIdAndPathDict);
-            logger.LogInformation($"Documents to import count is {documentIdAndPathToImportDict.Count}");
+            Logger.LogInformation($"Documents to import count is {documentIdAndPathToImportDict.Count}");
             if (CheckIsCancellationRequested(cancellationToken, nameof(Stage5_GetDocumentIdAndPathToImportDict)))
                 return;
 
-            logger.LogInformation("Documents export began...");
+            Logger.LogInformation("Documents export began...");
             Stage6_ExportDocuments(documentIdsToExportList, syncDocumentsDirectoryPath, cancellationToken);
-            logger.LogInformation("Documents export finished.");
+            Logger.LogInformation("Documents export finished.");
 
-            logger.LogInformation("Documents import began...");
+            Logger.LogInformation("Documents import began...");
             Stage7_ImportDocuments(documentIdAndPathToImportDict, cancellationToken);
-            logger.LogInformation("Documents import finished.");
+            Logger.LogInformation("Documents import finished.");
         }
 
         /// <summary>
@@ -500,7 +498,7 @@ namespace Ant0nRocket.Lib.Dodb
                     var documentId = Guid.Parse(match.Groups["DocumentId"].Value);
                     if (foundDocumentsIdAndPath.ContainsKey(documentId))
                     {
-                        logger.LogError($"Id {documentId} already added! SYNC CONFLICT???");
+                        Logger.LogError($"Id {documentId} already added! SYNC CONFLICT???");
                     }
                     else
                     {
@@ -566,7 +564,7 @@ namespace Ant0nRocket.Lib.Dodb
 
                 if (!FileSystemUtils.TouchDirectory(syncDocumentsDirectoryWithSubFolderPath))
                 {
-                    logger.LogError($"Can't create directory '{syncDocumentsDirectoryWithSubFolderPath}'. Sync operation stopped");
+                    Logger.LogError($"Can't create directory '{syncDocumentsDirectoryWithSubFolderPath}'. Sync operation stopped");
                     return;
                 }
 
@@ -574,7 +572,7 @@ namespace Ant0nRocket.Lib.Dodb
                 var resultPath = Path.Combine(syncDocumentsDirectoryWithSubFolderPath, shortFileName);
 
                 File.WriteAllText(resultPath, documentJsonValue);
-                logger.LogInformation($"Document '{documentId}' have been exported.");
+                Logger.LogInformation($"Document '{documentId}' have been exported.");
             }
         }
 
@@ -591,14 +589,14 @@ namespace Ant0nRocket.Lib.Dodb
                 var document = FileSystemUtils.TryReadFromFile<Document>(kvp.Value);
                 if (document!.Id != kvp.Key)
                 {
-                    logger.LogWarning($"Id mismatch during deserialization of file '{kvp.Value}'. Skipped");
+                    Logger.LogWarning($"Id mismatch during deserialization of file '{kvp.Value}'. Skipped");
                     continue;
                 }
 
                 var payloadType = ReflectionUtils.FindTypeAccrossAppDomain(document.PayloadTypeName!);
                 if (payloadType == null)
                 {
-                    logger.LogError($"Type '{document.PayloadTypeName}' from '{document.Id}' doesn't exists in current app domain");
+                    Logger.LogError($"Type '{document.PayloadTypeName}' from '{document.Id}' doesn't exists in current app domain");
                     continue;
                 }
 
@@ -619,15 +617,15 @@ namespace Ant0nRocket.Lib.Dodb
 
                 if (pushResult is GrDtoPushSuccess)
                 {
-                    logger.LogInformation($"Documents '{dto.Id}' have been imported.");
+                    Logger.LogInformation($"Documents '{dto.Id}' have been imported.");
                 }
                 else if (pushResult is GrDtoPushFailed f)
                 {
-                    logger.LogError($"Unable to import document from file '{kvp.Value}': {f.Messages.AsJson()}");
+                    Logger.LogError($"Unable to import document from file '{kvp.Value}': {f.Messages.AsJson()}");
                 }
                 else
                 {
-                    logger.LogFatal($"UNKNOWN PUSH RESULT '{pushResult.GetType().Name}");
+                    Logger.LogFatal($"UNKNOWN PUSH RESULT '{pushResult.GetType().Name}");
                 }
             }
         }

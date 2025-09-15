@@ -9,7 +9,7 @@ namespace Ant0nRocket.Lib.Dodb.Tests.Contexts
 {
     public class TestDbContext : DodbContextBase
     {
-        private static Logger _logger = Logger.Create(nameof(TestDbContext));
+        //private static Logger _logger = Logger.Create(nameof(TestDbContext));
         private static bool _databaseRecteated = false;
 
         public DbSet<User> Users { get; set; }
