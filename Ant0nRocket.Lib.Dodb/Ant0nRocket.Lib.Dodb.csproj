@@ -13,9 +13,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Ant0nRocket.Lib" Version="8.2.1" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.9" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Ant0nRocket.Lib\Ant0nRocket.Lib\Ant0nRocket.Lib.csproj" />
   </ItemGroup>
 
   <Target Name="PostPackNugetDeploy" AfterTargets="Pack">
