@@ -6,6 +6,7 @@ using Ant0nRocket.Lib.Dodb.Gateway;
 using Ant0nRocket.Lib.Dodb.Gateway.Abstractions;
 using Ant0nRocket.Lib.Dodb.Gateway.Helpers;
 using Ant0nRocket.Lib.Dodb.Gateway.Responses;
+using Ant0nRocket.Lib.Dodb.Helpers;
 using Ant0nRocket.Lib.Dodb.Models;
 using Ant0nRocket.Lib.Dodb.Serialization;
 using Ant0nRocket.Lib.Extensions;
@@ -15,6 +16,7 @@ using Ant0nRocket.Lib.Reflection;
 
 using Microsoft.EntityFrameworkCore;
 
+using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 
 namespace Ant0nRocket.Lib.Dodb
@@ -246,6 +248,8 @@ namespace Ant0nRocket.Lib.Dodb
                         }
                     });
 
+                    _docCache.AddToCache(dto.Id, dto.DateCreatedUtc);
+
                     return pushResult;
                 }
                 else if (pushResult is GrDtoPushFailed failedResult)
@@ -335,16 +339,13 @@ namespace Ant0nRocket.Lib.Dodb
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="syncDocumentsDirectoryPath"></param>
-        /// <param name="cancellationToken"></param>
-        /// <returns></returns>
-        public static async Task SyncDocumentsAsync(string syncDocumentsDirectoryPath, CancellationToken? cancellationToken = default) =>
+        public static async Task SyncDocumentsAsync(string syncDocumentsDirectoryPath, int syncDepthDays = 365, CancellationToken? cancellationToken = default) =>
             await Task.Run(() =>
             {
                 mutexForPushDto.WaitOne();
                 try
                 {
-                    SyncDocuments(syncDocumentsDirectoryPath, cancellationToken);
+                    SyncDocuments(syncDocumentsDirectoryPath, syncDepthDays, cancellationToken);
                 }
                 finally
                 {
@@ -355,9 +356,7 @@ namespace Ant0nRocket.Lib.Dodb
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="syncDocumentsDirectoryPath"></param>
-        /// <param name="cancellationToken"></param>
-        public static void SyncDocuments(string syncDocumentsDirectoryPath, CancellationToken? cancellationToken = default)
+        public static void SyncDocuments(string syncDocumentsDirectoryPath, int syncDepthDays = 365, CancellationToken? cancellationToken = default)
         {
             if (syncDocumentsDirectoryPath == default)
             {
@@ -370,10 +369,23 @@ namespace Ant0nRocket.Lib.Dodb
 
                 Logger.LogInformation($"Documents synchronization started...");
 
-                PerformSyncDocumentsIteration(syncDocumentsDirectoryPath, cancellationToken);
+                PopulateDocsCache();
+                PerformSyncDocumentsIteration(syncDocumentsDirectoryPath, syncDepthDays, cancellationToken);
 
                 Logger.LogInformation($"Documents synchronization finished.");
             }
+        }
+
+        private static void PopulateDocsCache()
+        {
+            if (!_docCache.IsEmpty) return;
+            using var dbContext = GetDbContext();
+            var docs = dbContext.Documents.AsNoTracking().Select(d => new { d.Id, d.DateCreatedUtc });
+            foreach (var doc in docs)
+            {
+                _docCache.AddToCache(doc.Id, doc.DateCreatedUtc);
+            }
+            Logger.LogTrace($"Documents cache populated with {docs.Count()} elements");
         }
 
         private static bool CheckIsCancellationRequested(CancellationToken? cancellationToken, string stoppedAtStageName)
@@ -387,8 +399,11 @@ namespace Ant0nRocket.Lib.Dodb
             return false;
         }
 
-        private static void PerformSyncDocumentsIteration(string syncDocumentsDirectoryPath, CancellationToken? cancellationToken = default)
+        private static readonly DocCache _docCache = new();
+
+        private static void PerformSyncDocumentsIteration(string syncDocumentsDirectoryPath, int syncDepthDays, CancellationToken? cancellationToken = default)
         {
+            /*
             var exportFromDate = Stage1_ScanSyncDocumentsDirectoryMinExportDate(syncDocumentsDirectoryPath);
             Logger.LogInformation($"Operational period begin is {exportFromDate}");
             if (CheckIsCancellationRequested(cancellationToken, nameof(Stage1_ScanSyncDocumentsDirectoryMinExportDate)))
@@ -423,7 +438,170 @@ namespace Ant0nRocket.Lib.Dodb
             Logger.LogInformation("Documents import began...");
             Stage7_ImportDocuments(documentIdAndPathToImportDict, cancellationToken);
             Logger.LogInformation("Documents import finished.");
+
+            return; // чтобы дальнейший код не исполнялся
+
+            */
+            using var dbContext = GetDbContext();
+
+            var workDate = DateTime.UtcNow.StartOfTheDay().AddDays(syncDepthDays * -1);
+            var currentDate = DateTime.UtcNow;
+
+            while (workDate < currentDate)
+            {
+                var exportedDocsCount = ExportDocsForDate(syncDocumentsDirectoryPath, workDate, dbContext, cancellationToken);
+                var importedDocsCount = ImportDocsForDate(syncDocumentsDirectoryPath, workDate, dbContext, cancellationToken);
+
+                if (exportedDocsCount > 0 || importedDocsCount > 0)
+                {
+                    Logger.LogTrace($"Sync done for '{workDate}': {exportedDocsCount} docs exported, {importedDocsCount} docs imported");
+                }
+
+                workDate = workDate.AddDays(1);
+            }
         }
+
+        
+
+        private static int ExportDocsForDate(string syncDocumentsDirectoryPath, DateTime workDate, DodbContextBase dbContext, CancellationToken? cancellationToken = default)
+        {
+            var exportedDocsCount = 0;
+            var d1 = workDate.StartOfTheDay(dateTimeKind: DateTimeKind.Utc);
+            var d2 = workDate.EndOfTheDay(dateTimeKind: DateTimeKind.Utc);
+            // Check any document exists
+
+            if (!_docCache.HasDocs(d1)) return 0;
+
+            var docInfos = _docCache.GetDocs(workDate);
+            var workDirPath = Path.Combine(syncDocumentsDirectoryPath, workDate.ToString("yyyyMMdd"));
+            FileSystemUtils.TouchDirectory(workDirPath);
+
+            var filesInWorkDir = Directory.GetFiles(workDirPath).ToImmutableHashSet();
+            foreach (var docInfo in docInfos)
+            {
+                /*
+                 filesInWorkDir содержит перечень файлов текущей рабочей директории.
+                 Нет нужды формировать полное имя файла: проверили, что Id встрачается в папке - до свидания!
+                 Ну а если не встречается - работаем.
+                 */
+                var fileExists = false;
+                foreach (var filePath in filesInWorkDir)
+                    if (filePath.IndexOf(docInfo.Id.ToString(), StringComparison.InvariantCultureIgnoreCase) > -1)
+                    {
+                        fileExists = true;
+                        break;
+                    }
+
+                if (fileExists) continue;
+
+                var doc = dbContext.Documents.AsNoTracking().Single(d => d.Id == docInfo.Id);
+                var exportFileName = $"{doc.DateCreatedUtc.Ticks}_{doc.PayloadTypeName!.FromLatest('.')}_{doc.Id}.json";
+                var exportFilePath = Path.Combine(workDirPath, exportFileName);
+                if (!File.Exists(exportFilePath))
+                {
+                    var json = doc.AsJson();
+                    File.WriteAllText(exportFilePath, json);
+                    exportedDocsCount++;
+                    Logger.LogTrace($"Document exported to '{exportFilePath}'");
+                }
+            }
+
+            return exportedDocsCount;
+        }
+
+        private static int ImportDocsForDate(string syncDocumentsDirectoryPath, DateTime workDate, DodbContextBase dbContext, CancellationToken? cancellationToken = default)
+        {
+            const string FILENAME_PATTERN = @"(?<Tickes>\d{18,})_(?<Type>[A-Za-z]+)_" +
+                @"(?<DocumentId>[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})";
+
+            var importedDocsCount = 0;
+            var errorsCount = 0;
+
+            var workDirPath = Path.Combine(syncDocumentsDirectoryPath, workDate.ToString("yyyyMMdd"));
+
+            if (!Directory.Exists(workDirPath)) return 0;
+
+            var filePaths = Directory.GetFiles(workDirPath);
+            foreach (var filePath in filePaths)
+            {
+                var match = Regex.Match(filePath, FILENAME_PATTERN);
+                if (!match.Success)
+                {
+                    Logger.LogWarning($"File '{filePath}' doesn't match naming convention!");
+                    continue;
+                }
+
+                //var dateCreated = new DateTime(long.Parse(match.Groups["Tickes"].Value), DateTimeKind.Utc);
+                //var payloadType = match.Groups["Type"].Value;
+                var docId = Guid.Parse(match.Groups["DocumentId"].Value);
+                if (_docCache.ContainsDoc(docId)) continue;
+
+                var document = FileSystemUtils.TryReadFromFile<Document>(filePath, false);
+                if (document == default)
+                {
+                    Logger.LogWarning($"File '{filePath}' could not be deserialized");
+                    continue;
+                }
+
+                var payloadType = ReflectionUtils.FindType(document.PayloadTypeName!);
+
+                if (payloadType == null)
+                {
+                    Logger.LogError($"Type '{document.PayloadTypeName}' from '{document.Id}' doesn't exists in current app domain");
+                    continue;
+                }
+
+                var dto = new DtoOf<object>
+                {
+                    Id = document.Id,
+                    UserId = document.UserId,
+                    RequiredDocumentId = document.RequiredDocumentId,
+                    Description = document.Description,
+                    DateCreatedUtc = document.DateCreatedUtc,
+                    Payload = Ant0nRocketLibConfig.GetJsonSerializer().Deserialize(
+                        contents: document.PayloadJson!,
+                        type: payloadType!,
+                        throwExceptions: true),
+                };
+
+                var pushResult = PushDto(dto);
+
+                if (pushResult is GrDtoPushSuccess)
+                {
+                    importedDocsCount++;
+                    Logger.LogInformation($"Document '{dto.Id}' have been imported from '{filePath}'");
+                }
+                else if (pushResult is GrDtoPushFailed f)
+                {
+                    if (f.Reason == GrPushFailReason.RequiredDocumentNotExists)
+                    {
+                        errorsCount++;
+                        Logger.LogWarning($"Unable to import doc from file '{filePath}': required doc is missing");
+                    }
+                    else
+                    {
+                        Logger.LogError($"Unable to import document from file '{filePath}': {f.Messages.AsJson()}");
+                    }
+                }
+                else
+                {
+                    Logger.LogFatal($"UNKNOWN PUSH RESULT '{pushResult.GetType().Name}");
+                }
+            }
+
+            if (errorsCount > 0)
+            {
+                var newErrorsCount = 0;
+                for (var i = 0; i < 3; i++)
+                {
+                    newErrorsCount = ImportDocsForDate(syncDocumentsDirectoryPath, workDate, dbContext, cancellationToken);
+                    Logger.LogWarning($"There were missing required documents. Start over again.");
+                }
+            }
+
+            return importedDocsCount;
+        }
+
 
         /// <summary>
         /// Sync directory could contain archives (zip or 7z) in format 'yyyyMMdd.(zip|7z)'.<br />
